@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Antigravity Snake - IA Edition</title>
-    <!-- Modern Tech Stack -->
+    <title>Antigravity Snake - Advanced IA</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
@@ -12,11 +11,10 @@
 </head>
 <body>
     <div id="app">
-        <!-- Minimal HUD -->
         <div class="hud">
             <div class="stat">SCORE <span id="score">0</span></div>
             <div class="stat">COINS <span id="coins">0</span></div>
-            <div class="stat ia-status">IA: <span id="ia-status-label">OFF</span></div>
+            <div class="stat ia-status">IA THEME: <span id="ia-current-class">WAITING...</span></div>
         </div>
 
         <div class="game-viewport">
@@ -27,53 +25,51 @@
 
             <!-- Menus -->
             <div id="overlay-menu" class="menu-overlay">
+                
+                <!-- Main Menu with Difficulty -->
                 <div id="main-menu" class="menu-content">
-                    <h1 class="logo-neon">NEON SNAKE</h1>
-                    <p class="subtitle">PREMIUM IA-CONTROLLED EXPERIENCE</p>
+                    <h1 class="logo-neon">NEON CORE</h1>
+                    <p class="subtitle">SNAKE SYSTEM ORCHESTRATION</p>
                     
-                    <div class="menu-actions">
-                        <button id="btn-play" class="btn-neon">INICIAR JOGO</button>
-                        <button id="btn-setup-ia" class="btn-secondary">CONFIGURAR IA</button>
-                        <button id="btn-worlds" class="btn-secondary">REVISAR MUNDOS</button>
+                    <div class="difficulty-selector">
+                        <p>ESCOLHA A DIFICULDADE:</p>
+                        <div class="diff-btns">
+                            <button class="btn-diff active" data-diff="easy">FÁCIL</button>
+                            <button class="btn-diff" data-diff="medium">MÉDIO</button>
+                            <button class="btn-diff" data-diff="hard">DIFÍCIL</button>
+                        </div>
+                    </div>
+
+                    <div class="menu-actions mt-20">
+                        <button id="btn-play" class="btn-neon">INICIAR TERMINAL</button>
+                        <button id="btn-setup-ia" class="btn-secondary">CONFIGURAR IA (TEMA DINÂMICO)</button>
                     </div>
                 </div>
 
-                <div id="world-menu" class="menu-content hidden">
-                    <h2 class="title-minimal">MUNDOS</h2>
-                    <div class="world-options">
-                        <div class="world-card border-neon active" data-world="neon">VOID NEON</div>
-                        <div class="world-card border-neon" data-world="crystal">CRYSTAL CAVE</div>
-                        <div class="world-card border-neon" data-world="lava">LAVA CORE</div>
-                    </div>
-                    <button id="btn-close-worlds" class="btn-secondary mt-20">VOLTAR</button>
-                </div>
-
+                <!-- Game Over -->
                 <div id="game-over" class="menu-content hidden">
-                    <h1 class="text-danger">TERMINAL FAILURE</h1>
-                    <div id="stats-log" class="log-table-container">
-                        <!-- Table Machine output will be here -->
-                    </div>
+                    <h1 class="text-danger">SYSTEM CRASH</h1>
+                    <div id="stats-log" class="log-table-container"></div>
                     <div class="menu-actions">
                         <button id="btn-restart" class="btn-neon">REBOOT</button>
-                        <button id="btn-download-json" class="btn-secondary">EXPORT DATA (.JSON)</button>
-                        <button id="btn-back-menu" class="btn-secondary">EXIT TO CORE</button>
+                        <button id="btn-download-json" class="btn-secondary">EXPORT JSON</button>
+                        <button id="btn-back-menu" class="btn-secondary">BACK TO CORE</button>
                     </div>
                 </div>
 
                 <!-- IA Configuration Overlay -->
                 <div id="ia-menu" class="menu-content hidden">
-                    <h2 class="title-minimal">TEACHABLE MACHINE</h2>
-                    <p>Insira a URL do seu modelo exportado:</p>
+                    <h2 class="title-minimal">TEACHABLE MACHINE CLOUD</h2>
+                    <p>Suas classes determinarão a cor do mundo!</p>
                     <input type="text" id="ia-model-url" placeholder="https://teachablemachine.withgoogle.com/models/..." class="neon-input">
                     <div class="ia-controls mt-20">
-                        <button id="btn-start-ia" class="btn-neon">ATIVAR WEBCAM & IA</button>
+                        <button id="btn-start-ia" class="btn-neon">CONECTAR IA</button>
                         <button id="btn-close-ia" class="btn-secondary">VOLTAR</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Progress Bar (Antigravity Flow) -->
         <div class="flow-container">
             <div id="antigravity-bar" class="flow-fill"></div>
         </div>

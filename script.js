@@ -1,110 +1,85 @@
 /**
- * ANTIGRAVITY SNAKE ENGINE v2.0
- * Roles: Senior Game Developer & AI Engineer
+ * ANTIGRAVITY SNAKE ENGINE v3.0 - ADVANCED IA & ORCHESTRATION
+ * Senior Game Architect & IA Systems Engineer
  */
 
 class TableMachine {
-    constructor() {
-        this.history = [];
-    }
+    constructor() { this.history = []; }
 
     logGame(score, coins, startTime) {
         const timeSurvived = Math.floor((Date.now() - startTime) / 1000);
-        const entry = {
-            points: score,
-            moedas: coins,
-            tempo_sobrevivencia: `${timeSurvived}s`,
-            timestamp: new Date().toISOString()
-        };
+        const entry = { points: score, moedas: coins, tempo: `${timeSurvived}s`, date: new Date().toLocaleTimeString() };
         this.history.push(entry);
         return entry;
     }
 
-    renderTable(container) {
-        if (!container) return;
+    render(container) {
         const last = this.history[this.history.length - 1];
+        if (!last) return;
         container.innerHTML = `
             <table>
-                <thead>
-                    <tr><th>METRIC</th><th>VALUE</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>POINTS</td><td>${last.points}</td></tr>
-                    <tr><td>COINS</td><td>${last.moedas}</td></tr>
-                    <tr><td>SURVIVAL</td><td>${last.tempo_sobrevivencia}</td></tr>
-                </tbody>
+                <tr><td>FINAL SCORE</td><td>${last.points}</td></tr>
+                <tr><td>COINS COLECTED</td><td>${last.moedas}</td></tr>
+                <tr><td>TIME ACTIVE</td><td>${last.tempo}</td></tr>
             </table>
         `;
     }
 
     exportJSON() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "game_stats.json");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        const anchor = document.createElement('a');
+        anchor.setAttribute("href", dataStr); anchor.setAttribute("download", "snake_logs.json");
+        anchor.click();
     }
 }
 
-class AntigravityOrchestrator {
-    constructor() {
-        this.progressionLevel = 0;
-    }
-
-    processFruit(coins) {
-        // Antigravity Logic: Each 5 coins increases entropy
-        if (coins > 0 && coins % 5 === 0) {
-            this.progressionLevel++;
-            this.updateProgressBar();
-            return true; // Threshold reached
+class AntigravityPhysics {
+    constructor() { this.level = 0; }
+    
+    process(coins, difficultyFactor) {
+        // Every 5 coins * difficultyFactor trigger progression
+        const threshold = 5;
+        if (coins > 0 && coins % threshold === 0) {
+            this.level++;
+            this.updateUI();
+            return true;
         }
-        this.updateProgressBar(coins % 5);
+        this.updateUI(coins % threshold);
         return false;
     }
 
-    updateProgressBar(partial = 5) {
+    updateUI(partial = 5) {
         const bar = document.getElementById('antigravity-bar');
         if (bar) bar.style.width = `${(partial / 5) * 100}%`;
     }
 }
 
-class IAManager {
+class DynamicIAManager {
     constructor() {
-        this.model = null;
-        this.webcam = null;
-        this.labelContainer = null;
-        this.maxPredictions = 0;
-        this.isActive = false;
-        this.currentPrediction = "None";
+        this.model = null; this.webcam = null; this.isActive = false;
+        this.currentClass = "None";
+        // Map of probable class names to colors
+        this.colorMap = {
+            "Red": "#440000", "Vermelho": "#440000",
+            "Blue": "#000044", "Azul": "#000044",
+            "Green": "#004400", "Verde": "#004400",
+            "Yellow": "#444400", "Amarelo": "#444400",
+            "Purple": "#220044", "Roxo": "#220044",
+            "Normal": "#000000", "Fundo": "#000000"
+        };
     }
 
-    async init(modelURL) {
+    async init(url) {
         try {
-            const checkpointURL = modelURL + "model.json";
-            const metadataURL = modelURL + "metadata.json";
-
-            this.model = await tmImage.load(checkpointURL, metadataURL);
-            this.maxPredictions = this.model.getTotalClasses();
-
-            const flip = true; 
-            this.webcam = new tmImage.Webcam(120, 90, flip);
-            await this.webcam.setup();
-            await this.webcam.play();
-            
+            this.model = await tmImage.load(url + "model.json", url + "metadata.json");
+            this.webcam = new tmImage.Webcam(110, 85, true);
+            await this.webcam.setup(); await this.webcam.play();
+            document.getElementById("webcam-container").innerHTML = ""; // Clear
             document.getElementById("webcam-container").appendChild(this.webcam.canvas);
             this.isActive = true;
-            document.getElementById('ia-status-label').textContent = "ONLINE";
-            document.getElementById('ia-status-label').style.color = "#00FF00";
-            
             this.loop();
             return true;
-        } catch (e) {
-            console.error("Erro IA:", e);
-            alert("Falha ao carregar modelo IA. Verifique a URL.");
-            return false;
-        }
+        } catch (e) { alert("IA Loader Error"); return false; }
     }
 
     async loop() {
@@ -116,278 +91,220 @@ class IAManager {
 
     async predict() {
         const prediction = await this.model.predict(this.webcam.canvas);
-        let highestProb = 0;
-        let bestClass = "None";
+        let best = { prob: 0, className: "" };
+        prediction.forEach(p => { if (p.probability > best.prob) best = p; });
 
-        for (let i = 0; i < this.maxPredictions; i++) {
-            if (prediction[i].probability > highestProb) {
-                highestProb = prediction[i].probability;
-                bestClass = prediction[i].className;
-            }
+        if (best.prob > 0.8 && best.className !== this.currentClass) {
+            this.currentClass = best.className;
+            document.getElementById('ia-current-class').textContent = this.currentClass;
+            this.updateWorldColor(this.currentClass);
         }
+    }
 
-        // Logic: Confidence >= 80%
-        if (highestProb >= 0.8) {
-            this.currentPrediction = bestClass;
-        }
+    updateWorldColor(className) {
+        // Feature: IA sets World Background
+        const color = this.colorMap[className] || this.generateColorFromText(className);
+        document.body.style.backgroundColor = color;
+    }
+
+    generateColorFromText(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        // Keep it dark and moody for the neon vibe
+        const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+        const hex = "00000".substring(0, 6 - c.length) + c;
+        return `#${hex.substring(0,2)}00${hex.substring(4,6)}`; // Darkened Red/Blue mix
     }
 }
 
-// MAIN ENGINE
-const game = {
-    canvas: null,
-    ctx: null,
-    grid: 20,
-    tileCount: 40, // 800/20
-    snake: [],
-    dx: 0, dy: -1,
-    food: null,
-    coins: [],
-    score: 0,
-    sessionCoins: 0,
-    startTime: 0,
-    isPlaying: false,
-    speed: 120,
-    enemy: { body: [], speed: 2 }, // enemy speed counter
+const Core = {
+    // Engine State
+    config: { grid: 20, tileCount: 40 },
+    stats: { score: 0, coins: 0, difficulty: 'medium', startTime: 0 },
+    difficultyMap: {
+        easy: { speed: 150, entropy: 0.5, enemySpeed: 3 },
+        medium: { speed: 100, entropy: 1.0, enemySpeed: 2 },
+        hard: { speed: 60, entropy: 2.0, enemySpeed: 1 }
+    },
     
     // Components
-    tableMachine: new TableMachine(),
-    antigravity: new AntigravityOrchestrator(),
-    ia: new IAManager(),
+    tables: new TableMachine(),
+    antigravity: new AntigravityPhysics(),
+    ia: new DynamicIAManager(),
 
+    // Game Objects
+    snake: [], dx: 0, dy: -1,
+    enemy: { body: [], tick: 0 },
+    items: { food: null, gold: [] },
+    
     init() {
-        this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.setupListeners();
+        this.cvs = document.getElementById('gameCanvas');
+        this.ctx = this.cvs.getContext('2d');
+        this.bindEvents();
     },
 
-    setupListeners() {
-        document.getElementById('btn-play').onclick = () => this.start();
-        document.getElementById('btn-restart').onclick = () => this.start();
-        document.getElementById('btn-setup-ia').onclick = () => this.toggleMenu('ia-menu');
-        document.getElementById('btn-worlds').onclick = () => this.toggleMenu('world-menu');
-        
-        // FIX: Voltar button behavior
-        document.getElementById('btn-close-worlds').onclick = () => this.toggleMenu('main-menu');
-        document.getElementById('btn-close-ia').onclick = () => this.toggleMenu('main-menu');
-        document.getElementById('btn-back-menu').onclick = () => this.toggleMenu('main-menu');
-
-        document.getElementById('btn-start-ia').onclick = async () => {
+    bindEvents() {
+        document.getElementById('btn-play').onclick = () => this.boot();
+        document.getElementById('btn-restart').onclick = () => this.boot();
+        document.getElementById('btn-setup-ia').onclick = () => this.showMenu('ia-menu');
+        document.getElementById('btn-start-ia').onclick = () => {
             const url = document.getElementById('ia-model-url').value;
-            if (url) await this.ia.init(url);
-            else alert("URL Necessária!");
+            if(url) this.ia.init(url);
         };
 
-        document.getElementById('btn-download-json').onclick = () => this.tableMachine.exportJSON();
+        // Difficulty toggles
+        document.querySelectorAll('.btn-diff').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.btn-diff').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.stats.difficulty = btn.dataset.diff;
+            };
+        });
 
-        window.addEventListener('keydown', e => this.handleInput(e));
+        document.getElementById('btn-close-ia').onclick = () => this.showMenu('main-menu');
+        document.getElementById('btn-back-menu').onclick = () => this.showMenu('main-menu');
+        document.getElementById('btn-download-json').onclick = () => this.tables.exportJSON();
+        window.onkeydown = (e) => this.input(e);
     },
 
-    toggleMenu(menuId) {
+    showMenu(id) {
         document.querySelectorAll('.menu-content').forEach(m => m.classList.add('hidden'));
-        document.getElementById(menuId).classList.remove('hidden');
+        document.getElementById(id).classList.remove('hidden');
         document.getElementById('overlay-menu').classList.remove('hidden');
     },
 
-    start() {
-        this.snake = [{x: 20, y: 20}, {x: 20, y: 21}, {x: 20, y: 22}];
+    boot() {
+        const settings = this.difficultyMap[this.stats.difficulty];
+        this.stats.score = 0; this.stats.coins = 0;
+        this.snake = [{x:20, y:20}, {x:20, y:21}, {x:20, y:22}];
+        this.enemy.body = [{x:5, y:5}, {x:5, y:6}];
         this.dx = 0; this.dy = -1;
-        this.score = 0;
-        this.sessionCoins = 0;
-        this.speed = 120;
-        this.startTime = Date.now();
-        this.spawnFood();
-        this.coins = [];
-        this.enemy.body = [{x: 5, y: 5}, {x: 5, y: 6}, {x: 5, y: 7}];
+        this.stats.startTime = Date.now();
+        this.currentSpeed = settings.speed;
         
-        this.isPlaying = true;
+        this.spawn();
+        this.playing = true;
         document.getElementById('overlay-menu').classList.add('hidden');
-        this.loop();
+        this.renderHUD();
+        this.run();
     },
 
-    loop() {
-        if (!this.isPlaying) return;
-        
-        // IA Control Check
-        if (this.ia.isActive) {
-            this.handleIAGesture(this.ia.currentPrediction);
-        }
-
+    run() {
+        if (!this.playing) return;
         setTimeout(() => {
-            this.update();
+            this.tick();
             this.draw();
-            this.loop();
-        }, this.speed);
+            this.run();
+        }, this.currentSpeed);
     },
 
-    handleIAGesture(gesture) {
-        // Modern turning logic based on gestural rotation
-        if (gesture === "None") return;
-        
-        // Use relative turning based on current direction
-        // Mão Aberta -> Girar Direita | Punho Fechado -> Girar Esquerda
-        if (gesture === "Mão Aberta") {
-            this.rotateSnake(1); // 1 = Clockwise
-        } else if (gesture === "Punho Fechado") {
-            this.rotateSnake(-1); // -1 = Counter-clockwise
-        }
-    },
-
-    rotateSnake(dir) {
-        // Simple rotation mapping
-        const currentDx = this.dx;
-        const currentDy = this.dy;
-        
-        if (dir === 1) { // Right turn
-            this.dx = -currentDy;
-            this.dy = currentDx;
-        } else { // Left turn
-            this.dx = currentDy;
-            this.dy = -currentDx;
-        }
-        // Force cleanup prediction to avoid spinning
-        this.ia.currentPrediction = "None";
-    },
-
-    handleInput(e) {
-        const key = e.key.toLowerCase();
-        if ((key === 'arrowup' || key === 'w') && this.dy === 0) { this.dx = 0; this.dy = -1; }
-        if ((key === 'arrowdown' || key === 's') && this.dy === 0) { this.dx = 0; this.dy = 1; }
-        if ((key === 'arrowleft' || key === 'a') && this.dx === 0) { this.dx = -1; this.dy = 0; }
-        if ((key === 'arrowright' || key === 'd') && this.dx === 0) { this.dx = 1; this.dy = 0; }
-    },
-
-    update() {
+    tick() {
         const head = { x: this.snake[0].x + this.dx, y: this.snake[0].y + this.dy };
-        
-        // FIX: Collision Detection (Strict grid)
-        if (head.x < 0 || head.x >= this.tileCount || head.y < 0 || head.y >= this.tileCount) {
-            return this.gameOver("WALL COLLISION");
-        }
+        const cfg = this.config;
 
-        for (let s of this.snake) {
-            if (head.x === s.x && head.y === s.y) return this.gameOver("SELF COLLISION");
-        }
-
-        // Enemy collision
-        for (let e of this.enemy.body) {
-            if (head.x === e.x && head.y === e.y) return this.gameOver("FATAL ENEMY ENCOUNTER");
-        }
+        // Collision Logic
+        if (head.x < 0 || head.x >= cfg.tileCount || head.y < 0 || head.y >= cfg.tileCount) return this.die("BOUNDARY BREACH");
+        if (this.snake.some(s => s.x === head.x && s.y === head.y)) return this.die("SELF INTERSECTION");
+        if (this.enemy.body.some(e => e.x === head.x && e.y === head.y)) return this.die("PREDATOR CONTACT");
 
         this.snake.unshift(head);
 
-        // Check Food
-        if (head.x === this.food.x && head.y === this.food.y) {
-            this.score += 10;
-            this.spawnFood();
-            this.antigravity.processFruit(this.sessionCoins);
+        // Consume Fruit
+        if (head.x === this.items.food.x && head.y === this.items.food.y) {
+            this.stats.score += 10;
+            this.spawn();
         } else {
             this.snake.pop();
         }
 
-        // Check Coins
-        const coinIndex = this.coins.findIndex(c => c.x === head.x && c.y === head.y);
-        if (coinIndex !== -1) {
-            this.coins.splice(coinIndex, 1);
-            this.sessionCoins++;
-            document.getElementById('coins').textContent = this.sessionCoins;
-            
-            // Antigravity Orchestration: Progress Difficulty
-            if (this.antigravity.processFruit(this.sessionCoins)) {
-                this.speed = Math.max(50, this.speed - 10); // Faster
-                this.enemy.speed = Math.max(1, this.enemy.speed - 1); // Enemy logic faster? 
-            }
+        // Consume Gold
+        const gIdx = this.items.gold.findIndex(g => g.x === head.x && g.y === head.y);
+        if (gIdx !== -1) {
+            this.items.gold.splice(gIdx, 1);
+            this.stats.coins++;
+            this.processDifficulty();
         }
 
         this.updateEnemy();
-        document.getElementById('score').textContent = this.score;
+        this.renderHUD();
+    },
+
+    processDifficulty() {
+        const set = this.difficultyMap[this.stats.difficulty];
+        if (this.antigravity.process(this.stats.coins)) {
+            // Speed increases based on entropy factor
+            this.currentSpeed = Math.max(40, this.currentSpeed - (10 * set.entropy));
+        }
     },
 
     updateEnemy() {
-        // AI Predator: Moves toward player
-        const eHead = this.enemy.body[0];
-        const pHead = this.snake[0];
-        
-        const possibleMoves = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
-        let best = possibleMoves[0];
-        let minDist = Infinity;
+        const set = this.difficultyMap[this.stats.difficulty];
+        this.enemy.tick++;
+        if (this.enemy.tick % set.enemySpeed !== 0) return; // Difficulty determines predator speed
 
-        possibleMoves.forEach(m => {
-            const nx = eHead.x + m.x;
-            const ny = eHead.y + m.y;
-            const dist = Math.abs(nx - pHead.x) + Math.abs(ny - pHead.y);
-            if (dist < minDist) { minDist = dist; best = m; }
+        const eH = this.enemy.body[0];
+        const target = this.snake[0];
+        const moves = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
+        let best = moves[0]; let minD = Infinity;
+
+        moves.forEach(m => {
+            const nx = eH.x + m.x, ny = eH.y + m.y;
+            const d = Math.abs(nx - target.x) + Math.abs(ny - target.y);
+            if (d < minD) { minD = d; best = m; }
         });
 
-        this.enemy.body.unshift({x: eHead.x + best.x, y: eHead.y + best.y});
+        this.enemy.body.unshift({x: eH.x + best.x, y: eH.y + best.y});
         this.enemy.body.pop();
     },
 
     draw() {
-        this.ctx.fillStyle = '#000';
+        this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
         this.ctx.fillRect(0, 0, 800, 800);
 
-        // Draw HUD lines (Minimalist)
-        this.ctx.strokeStyle = 'rgba(255, 0, 255, 0.05)';
-        for(let i=0; i<800; i+=this.grid) {
-            this.ctx.beginPath(); this.ctx.moveTo(i, 0); this.ctx.lineTo(i, 800); this.ctx.stroke();
-            this.ctx.beginPath(); this.ctx.moveTo(0, i); this.ctx.lineTo(800, i); this.ctx.stroke();
-        }
-
-        // Draw Player (Neon Pink)
-        this.ctx.shadowBlur = 15;
-        this.ctx.shadowColor = '#FF00FF';
+        // Player (Neon Pink)
+        this.ctx.shadowBlur = 10; this.ctx.shadowColor = '#FF00FF';
         this.ctx.fillStyle = '#FF00FF';
-        this.snake.forEach(s => {
-            this.ctx.fillRect(s.x * this.grid + 1, s.y * this.grid + 1, this.grid - 2, this.grid - 2);
+        this.snake.forEach(s => this.ctx.fillRect(s.x*20+1, s.y*20+1, 18, 18));
+
+        // Enemy (Purple)
+        this.ctx.shadowColor = '#8A2BE2'; this.ctx.fillStyle = '#8A2BE2';
+        this.enemy.body.forEach(e => this.ctx.fillRect(e.x*20+1, e.y*20+1, 18, 18));
+
+        // Items
+        this.ctx.shadowColor = '#FF00FF'; this.ctx.fillStyle = '#FF00FF';
+        this.ctx.beginPath(); this.ctx.arc(this.items.food.x*20+10, this.items.food.y*20+10, 6, 0, Math.PI*2); this.ctx.fill();
+
+        this.ctx.fillStyle = '#FFF'; this.ctx.shadowColor = '#FFF';
+        this.items.gold.forEach(g => {
+            this.ctx.beginPath(); this.ctx.arc(g.x*20+10, g.y*20+10, 4, 0, Math.PI*2); this.ctx.fill();
         });
-
-        // Draw Enemy (Dark Purple/Pink)
-        this.ctx.shadowColor = '#8A2BE2';
-        this.ctx.fillStyle = '#8A2BE2';
-        this.enemy.body.forEach(e => {
-            this.ctx.fillRect(e.x * this.grid + 1, e.y * this.grid + 1, this.grid - 2, this.grid - 2);
-        });
-
-        // Draw Food
-        this.ctx.shadowColor = '#FF00FF';
-        this.ctx.fillStyle = '#FF00FF';
-        this.ctx.beginPath();
-        this.ctx.arc(this.food.x * this.grid + this.grid/2, this.food.y * this.grid + this.grid/2, this.grid/3, 0, Math.PI*2);
-        this.ctx.fill();
-
-        // Draw Coins
-        this.ctx.fillStyle = '#FFF'; 
-        this.ctx.shadowColor = '#FFF';
-        this.coins.forEach(c => {
-            this.ctx.beginPath();
-            this.ctx.arc(c.x * this.grid + this.grid/2, c.y * this.grid + this.grid/2, this.grid/4, 0, Math.PI*2);
-            this.ctx.fill();
-        });
-
         this.ctx.shadowBlur = 0;
     },
 
-    spawnFood() {
-        this.food = { 
-            x: Math.floor(Math.random() * this.tileCount), 
-            y: Math.floor(Math.random() * this.tileCount) 
-        };
-        // Randomly spawn coins
-        if (Math.random() > 0.7) {
-            this.coins.push({
-                x: Math.floor(Math.random() * this.tileCount), 
-                y: Math.floor(Math.random() * this.tileCount)
-            });
-        }
+    spawn() {
+        this.items.food = { x: Math.floor(Math.random()*40), y: Math.floor(Math.random()*40) };
+        if (Math.random() > 0.6) this.items.gold.push({ x: Math.floor(Math.random()*40), y: Math.floor(Math.random()*40) });
     },
 
-    gameOver(reason) {
-        this.isPlaying = false;
-        this.tableMachine.logGame(this.score, this.sessionCoins, this.startTime);
-        this.tableMachine.renderTable(document.getElementById('stats-log'));
-        this.toggleMenu('game-over');
+    input(e) {
+        const k = e.key.toLowerCase();
+        if ((k === 'arrowup' || k === 'w') && this.dy === 0) { this.dx = 0; this.dy = -1; }
+        if ((k === 'arrowdown' || k === 's') && this.dy === 0) { this.dx = 0; this.dy = 1; }
+        if ((k === 'arrowleft' || k === 'a') && this.dx === 0) { this.dx = -1; this.dy = 0; }
+        if ((k === 'arrowright' || k === 'd') && this.dx === 0) { this.dx = 1; this.dy = 0; }
+    },
+
+    renderHUD() {
+        document.getElementById('score').textContent = this.stats.score;
+        document.getElementById('coins').textContent = this.stats.coins;
+    },
+
+    die(reason) {
+        this.playing = false;
+        this.tables.logGame(this.stats.score, this.stats.coins, this.stats.startTime);
+        this.tables.render(document.getElementById('stats-log'));
+        this.showMenu('game-over');
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => game.init());
+document.addEventListener('DOMContentLoaded', () => Core.init());
