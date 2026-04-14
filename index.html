@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Snake Game</title>
+    <!-- SEO Best Practices -->
+    <meta name="description" content="Um jogo da cobrinha (snake) dinâmico com gráficos em neon estilizado, pronto para GitHub Pages.">
+    
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="game-container">
+        <header>
+            <h1>Neon Snake</h1>
+            <div class="scores">
+                <div class="score-card">
+                    <span class="label">Score</span>
+                    <span id="score" class="value">0</span>
+                </div>
+                <div class="score-card high-score-card">
+                    <span class="label">High Score</span>
+                    <span id="high-score" class="value">0</span>
+                </div>
+            </div>
+        </header>
+        
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+            <div id="game-over" class="overlay hidden">
+                <h2>Game Over!</h2>
+                <p>Sua Pontuação: <span id="final-score">0</span></p>
+                <button id="restart-btn">Jogar Novamente</button>
+            </div>
+            <div id="start-screen" class="overlay">
+                <h2>Neon Snake</h2>
+                <p>Use setas do teclado (ou WASD) para jogar</p>
+                <button id="start-btn">Começar Jogo</button>
+            </div>
+        </div>
+        
+        <footer>
+            <div class="controls-hint">
+                <span>Use setas direcionais ou W A S D para controlar a cobra.</span>
+            </div>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
