@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Antigravity Snake - Advanced IA</title>
+    <title>Antigravity Snake - Logic Verified</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
@@ -14,36 +14,61 @@
         <div class="hud">
             <div class="stat">SCORE <span id="score">0</span></div>
             <div class="stat">COINS <span id="coins">0</span></div>
-            <div class="stat ia-status">IA THEME: <span id="ia-current-class">WAITING...</span></div>
+            <div class="stat ia-status">WORLD THEME: <span id="ia-current-class">DEFAULT</span></div>
         </div>
 
         <div class="game-viewport">
-            <!-- IA Webcam View (Floating) -->
+            <!-- Hidden Image for Upload Prediction -->
+            <img id="upload-preview" style="display:none; width: 200px; height: 200px;">
+            
             <div id="webcam-container" class="webcam-preview border-neon"></div>
             
             <canvas id="gameCanvas" width="800" height="800"></canvas>
 
-            <!-- Menus -->
             <div id="overlay-menu" class="menu-overlay">
                 
-                <!-- Main Menu with Difficulty -->
+                <!-- Main Menu -->
                 <div id="main-menu" class="menu-content">
                     <h1 class="logo-neon">NEON CORE</h1>
                     <p class="subtitle">SNAKE SYSTEM ORCHESTRATION</p>
                     
                     <div class="difficulty-selector">
-                        <p>ESCOLHA A DIFICULDADE:</p>
+                        <p>DIFICULDADE:</p>
                         <div class="diff-btns">
-                            <button class="btn-diff active" data-diff="easy">FÁCIL</button>
-                            <button class="btn-diff" data-diff="medium">MÉDIO</button>
-                            <button class="btn-diff" data-diff="hard">DIFÍCIL</button>
+                            <button id="diff-easy" class="btn-diff active" data-diff="easy">FÁCIL</button>
+                            <button id="diff-medium" class="btn-diff" data-diff="medium">MÉDIO</button>
+                            <button id="diff-hard" class="btn-diff" data-diff="hard">DIFÍCIL</button>
                         </div>
                     </div>
 
                     <div class="menu-actions mt-20">
                         <button id="btn-play" class="btn-neon">INICIAR TERMINAL</button>
-                        <button id="btn-setup-ia" class="btn-secondary">CONFIGURAR IA (TEMA DINÂMICO)</button>
+                        <button id="btn-setup-ia" class="btn-secondary">CONFIGURAR IA & CORES</button>
                     </div>
+                </div>
+
+                <!-- IA Configuration Menu -->
+                <div id="ia-menu" class="menu-content hidden">
+                    <h2 class="title-minimal">TEACHABLE MACHINE CLOUD</h2>
+                    
+                    <div class="ia-setup-row">
+                        <p>1. Link do Modelo:</p>
+                        <input type="text" id="ia-model-url" placeholder="https://teachablemachine.withgoogle.com/models/..." class="neon-input">
+                        <button id="btn-load-model" class="btn-secondary">CARREGAR MODELO</button>
+                    </div>
+
+                    <div class="ia-upload-section mt-20">
+                        <p>2. Definir Cor de Fundo:</p>
+                        <div class="upload-options">
+                            <button id="btn-start-webcam" class="btn-neon small">USAR WEBCAM</button>
+                            <span>OU</span>
+                            <label for="ia-image-upload" class="btn-neon small">COLAR/SUBIR IMAGEM</label>
+                            <input type="file" id="ia-image-upload" accept="image/*" style="display:none">
+                        </div>
+                        <p id="model-status" style="font-size:0.8rem; margin-top:10px; color: #aaa;">Status: Modelo não carregado</p>
+                    </div>
+
+                    <button id="btn-close-ia" class="btn-secondary mt-20">VOLTAR AO MENU</button>
                 </div>
 
                 <!-- Game Over -->
@@ -52,21 +77,11 @@
                     <div id="stats-log" class="log-table-container"></div>
                     <div class="menu-actions">
                         <button id="btn-restart" class="btn-neon">REBOOT</button>
-                        <button id="btn-download-json" class="btn-secondary">EXPORT JSON</button>
-                        <button id="btn-back-menu" class="btn-secondary">BACK TO CORE</button>
+                        <button id="btn-download-json" class="btn-secondary">EXPORT LOGS</button>
+                        <button id="btn-back-menu" class="btn-secondary">CORE MENU</button>
                     </div>
                 </div>
 
-                <!-- IA Configuration Overlay -->
-                <div id="ia-menu" class="menu-content hidden">
-                    <h2 class="title-minimal">TEACHABLE MACHINE CLOUD</h2>
-                    <p>Suas classes determinarão a cor do mundo!</p>
-                    <input type="text" id="ia-model-url" placeholder="https://teachablemachine.withgoogle.com/models/..." class="neon-input">
-                    <div class="ia-controls mt-20">
-                        <button id="btn-start-ia" class="btn-neon">CONECTAR IA</button>
-                        <button id="btn-close-ia" class="btn-secondary">VOLTAR</button>
-                    </div>
-                </div>
             </div>
         </div>
 

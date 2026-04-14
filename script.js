@@ -1,292 +1,249 @@
 /**
- * ANTIGRAVITY SNAKE ENGINE v3.0 - ADVANCED IA & ORCHESTRATION
- * Senior Game Architect & IA Systems Engineer
+ * ANTIGRAVITY SNAKE ENGINE v3.1 - INTERFACE & IA VERIFIED
  */
 
 class TableMachine {
     constructor() { this.history = []; }
-
-    logGame(score, coins, startTime) {
-        const timeSurvived = Math.floor((Date.now() - startTime) / 1000);
-        const entry = { points: score, moedas: coins, tempo: `${timeSurvived}s`, date: new Date().toLocaleTimeString() };
-        this.history.push(entry);
-        return entry;
+    log(score, coins, start) {
+        const time = Math.floor((Date.now() - start) / 1000);
+        this.history.push({ points: score, moedas: coins, tempo: `${time}s` });
     }
-
     render(container) {
+        if (!container) return;
         const last = this.history[this.history.length - 1];
-        if (!last) return;
         container.innerHTML = `
             <table>
-                <tr><td>FINAL SCORE</td><td>${last.points}</td></tr>
-                <tr><td>COINS COLECTED</td><td>${last.moedas}</td></tr>
-                <tr><td>TIME ACTIVE</td><td>${last.tempo}</td></tr>
+                <tr><td>POINTS</td><td>${last.points}</td></tr>
+                <tr><td>COINS</td><td>${last.moedas}</td></tr>
+                <tr><td>SURVIVAL</td><td>${last.tempo}</td></tr>
             </table>
         `;
     }
-
-    exportJSON() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
-        const anchor = document.createElement('a');
-        anchor.setAttribute("href", dataStr); anchor.setAttribute("download", "snake_logs.json");
-        anchor.click();
+    export() {
+        const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
+        const a = document.createElement('a'); a.href = data; a.download = "snake.json"; a.click();
     }
 }
 
-class AntigravityPhysics {
-    constructor() { this.level = 0; }
-    
-    process(coins, difficultyFactor) {
-        // Every 5 coins * difficultyFactor trigger progression
-        const threshold = 5;
-        if (coins > 0 && coins % threshold === 0) {
-            this.level++;
-            this.updateUI();
-            return true;
-        }
-        this.updateUI(coins % threshold);
-        return false;
-    }
-
-    updateUI(partial = 5) {
-        const bar = document.getElementById('antigravity-bar');
-        if (bar) bar.style.width = `${(partial / 5) * 100}%`;
-    }
-}
-
-class DynamicIAManager {
+class IAManager {
     constructor() {
         this.model = null; this.webcam = null; this.isActive = false;
-        this.currentClass = "None";
-        // Map of probable class names to colors
-        this.colorMap = {
-            "Red": "#440000", "Vermelho": "#440000",
-            "Blue": "#000044", "Azul": "#000044",
-            "Green": "#004400", "Verde": "#004400",
-            "Yellow": "#444400", "Amarelo": "#444400",
-            "Purple": "#220044", "Roxo": "#220044",
-            "Normal": "#000000", "Fundo": "#000000"
+        this.currentClass = "DEFAULT";
+        this.colorPalette = {
+            "Red": "#400", "Vermelho": "#400", "Blue": "#004", "Azul": "#004",
+            "Green": "#040", "Verde": "#040", "Yellow": "#440", "Amarelo": "#440"
         };
     }
 
-    async init(url) {
+    async loadModel(url) {
+        const status = document.getElementById('model-status');
         try {
+            status.textContent = "Status: Carregando...";
             this.model = await tmImage.load(url + "model.json", url + "metadata.json");
-            this.webcam = new tmImage.Webcam(110, 85, true);
-            await this.webcam.setup(); await this.webcam.play();
-            document.getElementById("webcam-container").innerHTML = ""; // Clear
-            document.getElementById("webcam-container").appendChild(this.webcam.canvas);
-            this.isActive = true;
-            this.loop();
+            status.textContent = "Status: Modelo Carregado!";
             return true;
-        } catch (e) { alert("IA Loader Error"); return false; }
+        } catch (e) {
+            status.textContent = "Status: Erro no Link.";
+            return false;
+        }
+    }
+
+    async startWebcam() {
+        if (!this.model) return alert("Carregue o modelo primeiro!");
+        this.webcam = new tmImage.Webcam(120, 90, true);
+        await this.webcam.setup(); await this.webcam.play();
+        const container = document.getElementById("webcam-container");
+        container.innerHTML = ""; container.appendChild(this.webcam.canvas);
+        this.isActive = true;
+        this.loop();
     }
 
     async loop() {
         if (!this.isActive) return;
         this.webcam.update();
-        await this.predict();
+        await this.predict(this.webcam.canvas);
         window.requestAnimationFrame(() => this.loop());
     }
 
-    async predict() {
-        const prediction = await this.model.predict(this.webcam.canvas);
-        let best = { prob: 0, className: "" };
-        prediction.forEach(p => { if (p.probability > best.prob) best = p; });
+    async predict(element) {
+        if (!this.model) return;
+        const prediction = await this.model.predict(element);
+        let best = { prob: 0, class: "" };
+        prediction.forEach(p => { if (p.probability > best.prob) best = { prob: p.probability, class: p.className }; });
 
-        if (best.prob > 0.8 && best.className !== this.currentClass) {
-            this.currentClass = best.className;
+        if (best.prob > 0.8 && best.class !== this.currentClass) {
+            this.currentClass = best.class;
             document.getElementById('ia-current-class').textContent = this.currentClass;
-            this.updateWorldColor(this.currentClass);
+            this.applyColor(this.currentClass);
         }
     }
 
-    updateWorldColor(className) {
-        // Feature: IA sets World Background
-        const color = this.colorMap[className] || this.generateColorFromText(className);
-        document.body.style.backgroundColor = color;
+    async handleUpload(file) {
+        if (!this.model) return alert("Carregue o modelo primeiro!");
+        const img = document.getElementById('upload-preview');
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            img.src = e.target.result;
+            img.onload = async () => {
+                await this.predict(img);
+            };
+        }
+        reader.readAsDataURL(file);
     }
 
-    generateColorFromText(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        // Keep it dark and moody for the neon vibe
-        const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-        const hex = "00000".substring(0, 6 - c.length) + c;
-        return `#${hex.substring(0,2)}00${hex.substring(4,6)}`; // Darkened Red/Blue mix
+    applyColor(className) {
+        const color = this.colorPalette[className] || "#000000";
+        document.body.style.backgroundColor = color;
     }
 }
 
-const Core = {
-    // Engine State
-    config: { grid: 20, tileCount: 40 },
-    stats: { score: 0, coins: 0, difficulty: 'medium', startTime: 0 },
-    difficultyMap: {
-        easy: { speed: 150, entropy: 0.5, enemySpeed: 3 },
-        medium: { speed: 100, entropy: 1.0, enemySpeed: 2 },
-        hard: { speed: 60, entropy: 2.0, enemySpeed: 1 }
+const Engine = {
+    state: { score: 0, coins: 0, difficulty: 'easy', start: 0, playing: false },
+    diffs: {
+        easy: { speed: 140, entropy: 0.5 },
+        medium: { speed: 100, entropy: 1.0 },
+        hard: { speed: 70, entropy: 1.5 }
     },
-    
-    // Components
-    tables: new TableMachine(),
-    antigravity: new AntigravityPhysics(),
-    ia: new DynamicIAManager(),
-
-    // Game Objects
     snake: [], dx: 0, dy: -1,
-    enemy: { body: [], tick: 0 },
-    items: { food: null, gold: [] },
-    
+    enemy: { body: [] },
+    food: null, gold: [],
+
+    tables: new TableMachine(),
+    ia: new IAManager(),
+
     init() {
         this.cvs = document.getElementById('gameCanvas');
         this.ctx = this.cvs.getContext('2d');
-        this.bindEvents();
+        this.bind();
     },
 
-    bindEvents() {
+    bind() {
+        // Main Navigation
         document.getElementById('btn-play').onclick = () => this.boot();
-        document.getElementById('btn-restart').onclick = () => this.boot();
-        document.getElementById('btn-setup-ia').onclick = () => this.showMenu('ia-menu');
-        document.getElementById('btn-start-ia').onclick = () => {
-            const url = document.getElementById('ia-model-url').value;
-            if(url) this.ia.init(url);
-        };
-
-        // Difficulty toggles
-        document.querySelectorAll('.btn-diff').forEach(btn => {
+        document.getElementById('btn-setup-ia').onclick = () => this.show('ia-menu');
+        
+        // Difficulty
+        ['easy', 'medium', 'hard'].forEach(id => {
+            const btn = document.getElementById(`diff-${id}`);
             btn.onclick = () => {
                 document.querySelectorAll('.btn-diff').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.stats.difficulty = btn.dataset.diff;
+                this.state.difficulty = id;
             };
         });
 
-        document.getElementById('btn-close-ia').onclick = () => this.showMenu('main-menu');
-        document.getElementById('btn-back-menu').onclick = () => this.showMenu('main-menu');
-        document.getElementById('btn-download-json').onclick = () => this.tables.exportJSON();
-        window.onkeydown = (e) => this.input(e);
+        // IA Functions
+        document.getElementById('btn-load-model').onclick = () => {
+            const url = document.getElementById('ia-model-url').value;
+            if (url) this.ia.loadModel(url);
+        };
+        document.getElementById('btn-start-webcam').onclick = () => this.ia.startWebcam();
+        document.getElementById('ia-image-upload').onchange = (e) => this.ia.handleUpload(e.target.files[0]);
+        document.getElementById('btn-close-ia').onclick = () => this.show('main-menu');
+
+        // Game Over Functions
+        document.getElementById('btn-restart').onclick = () => this.boot();
+        document.getElementById('btn-back-menu').onclick = () => this.show('main-menu');
+        document.getElementById('btn-download-json').onclick = () => this.tables.export();
+
+        window.onkeydown = (e) => this.keys(e);
     },
 
-    showMenu(id) {
+    show(id) {
         document.querySelectorAll('.menu-content').forEach(m => m.classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
         document.getElementById('overlay-menu').classList.remove('hidden');
     },
 
     boot() {
-        const settings = this.difficultyMap[this.stats.difficulty];
-        this.stats.score = 0; this.stats.coins = 0;
+        this.state.score = 0; this.state.coins = 0;
         this.snake = [{x:20, y:20}, {x:20, y:21}, {x:20, y:22}];
         this.enemy.body = [{x:5, y:5}, {x:5, y:6}];
         this.dx = 0; this.dy = -1;
-        this.stats.startTime = Date.now();
-        this.currentSpeed = settings.speed;
-        
-        this.spawn();
-        this.playing = true;
+        this.state.start = Date.now();
+        this.state.playing = true;
         document.getElementById('overlay-menu').classList.add('hidden');
-        this.renderHUD();
-        this.run();
+        this.spawn();
+        this.loop();
     },
 
-    run() {
-        if (!this.playing) return;
+    loop() {
+        if (!this.state.playing) return;
+        const currentSpeed = this.diffs[this.state.difficulty].speed;
+        // Increase speed based on coins and entropy
+        const dynamicSpeed = Math.max(40, currentSpeed - (this.state.coins * 5 * this.diffs[this.state.difficulty].entropy));
+        
         setTimeout(() => {
-            this.tick();
+            this.update();
             this.draw();
-            this.run();
-        }, this.currentSpeed);
+            this.loop();
+        }, dynamicSpeed);
     },
 
-    tick() {
+    update() {
         const head = { x: this.snake[0].x + this.dx, y: this.snake[0].y + this.dy };
-        const cfg = this.config;
-
-        // Collision Logic
-        if (head.x < 0 || head.x >= cfg.tileCount || head.y < 0 || head.y >= cfg.tileCount) return this.die("BOUNDARY BREACH");
-        if (this.snake.some(s => s.x === head.x && s.y === head.y)) return this.die("SELF INTERSECTION");
-        if (this.enemy.body.some(e => e.x === head.x && e.y === head.y)) return this.die("PREDATOR CONTACT");
+        if (head.x < 0 || head.x >= 40 || head.y < 0 || head.y >= 40) return this.die();
+        if (this.snake.some(s => s.x === head.x && s.y === head.y)) return this.die();
+        if (this.enemy.body.some(e => e.x === head.x && e.y === head.y)) return this.die();
 
         this.snake.unshift(head);
 
-        // Consume Fruit
-        if (head.x === this.items.food.x && head.y === this.items.food.y) {
-            this.stats.score += 10;
+        if (head.x === this.food.x && head.y === this.food.y) {
+            this.state.score += 10;
             this.spawn();
         } else {
             this.snake.pop();
         }
 
-        // Consume Gold
-        const gIdx = this.items.gold.findIndex(g => g.x === head.x && g.y === head.y);
+        const gIdx = this.gold.findIndex(g => g.x === head.x && g.y === head.y);
         if (gIdx !== -1) {
-            this.items.gold.splice(gIdx, 1);
-            this.stats.coins++;
-            this.processDifficulty();
+            this.gold.splice(gIdx, 1);
+            this.state.coins++;
+            // Update Antigravity Bar
+            document.getElementById('antigravity-bar').style.width = `${(this.state.coins % 5 / 5) * 100}%`;
         }
 
-        this.updateEnemy();
-        this.renderHUD();
+        this.aiEnemy();
+        this.hud();
     },
 
-    processDifficulty() {
-        const set = this.difficultyMap[this.stats.difficulty];
-        if (this.antigravity.process(this.stats.coins)) {
-            // Speed increases based on entropy factor
-            this.currentSpeed = Math.max(40, this.currentSpeed - (10 * set.entropy));
-        }
-    },
-
-    updateEnemy() {
-        const set = this.difficultyMap[this.stats.difficulty];
-        this.enemy.tick++;
-        if (this.enemy.tick % set.enemySpeed !== 0) return; // Difficulty determines predator speed
-
-        const eH = this.enemy.body[0];
+    aiEnemy() {
+        const eh = this.enemy.body[0];
         const target = this.snake[0];
         const moves = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
-        let best = moves[0]; let minD = Infinity;
-
+        let best = moves[0]; let min = Infinity;
         moves.forEach(m => {
-            const nx = eH.x + m.x, ny = eH.y + m.y;
+            const nx = eh.x + m.x, ny = eh.y + m.y;
             const d = Math.abs(nx - target.x) + Math.abs(ny - target.y);
-            if (d < minD) { minD = d; best = m; }
+            if (d < min) { min = d; best = m; }
         });
-
-        this.enemy.body.unshift({x: eH.x + best.x, y: eH.y + best.y});
+        this.enemy.body.unshift({x: eh.x + best.x, y: eh.y + best.y});
         this.enemy.body.pop();
     },
 
     draw() {
         this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        this.ctx.fillRect(0, 0, 800, 800);
-
-        // Player (Neon Pink)
-        this.ctx.shadowBlur = 10; this.ctx.shadowColor = '#FF00FF';
-        this.ctx.fillStyle = '#FF00FF';
+        this.ctx.fillRect(0,0,800,800);
+        this.ctx.shadowBlur = 10; this.ctx.shadowColor = '#F0F';
+        this.ctx.fillStyle = '#F0F';
         this.snake.forEach(s => this.ctx.fillRect(s.x*20+1, s.y*20+1, 18, 18));
-
-        // Enemy (Purple)
-        this.ctx.shadowColor = '#8A2BE2'; this.ctx.fillStyle = '#8A2BE2';
+        this.ctx.fillStyle = '#8A2BE2';
         this.enemy.body.forEach(e => this.ctx.fillRect(e.x*20+1, e.y*20+1, 18, 18));
-
-        // Items
-        this.ctx.shadowColor = '#FF00FF'; this.ctx.fillStyle = '#FF00FF';
-        this.ctx.beginPath(); this.ctx.arc(this.items.food.x*20+10, this.items.food.y*20+10, 6, 0, Math.PI*2); this.ctx.fill();
-
-        this.ctx.fillStyle = '#FFF'; this.ctx.shadowColor = '#FFF';
-        this.items.gold.forEach(g => {
+        this.ctx.fillStyle = '#F0F';
+        this.ctx.beginPath(); this.ctx.arc(this.food.x*20+10, this.food.y*20+10, 6, 0, Math.PI*2); this.ctx.fill();
+        this.ctx.fillStyle = '#FFF';
+        this.gold.forEach(g => {
             this.ctx.beginPath(); this.ctx.arc(g.x*20+10, g.y*20+10, 4, 0, Math.PI*2); this.ctx.fill();
         });
         this.ctx.shadowBlur = 0;
     },
 
     spawn() {
-        this.items.food = { x: Math.floor(Math.random()*40), y: Math.floor(Math.random()*40) };
-        if (Math.random() > 0.6) this.items.gold.push({ x: Math.floor(Math.random()*40), y: Math.floor(Math.random()*40) });
+        this.food = { x: Math.floor(Math.random()*40), y: Math.floor(Math.random()*40) };
+        if (Math.random()>0.7 && this.gold.length < 3) this.gold.push({ x: Math.floor(Math.random()*40), y: Math.floor(Math.random()*40) });
     },
 
-    input(e) {
+    keys(e) {
         const k = e.key.toLowerCase();
         if ((k === 'arrowup' || k === 'w') && this.dy === 0) { this.dx = 0; this.dy = -1; }
         if ((k === 'arrowdown' || k === 's') && this.dy === 0) { this.dx = 0; this.dy = 1; }
@@ -294,17 +251,17 @@ const Core = {
         if ((k === 'arrowright' || k === 'd') && this.dx === 0) { this.dx = 1; this.dy = 0; }
     },
 
-    renderHUD() {
-        document.getElementById('score').textContent = this.stats.score;
-        document.getElementById('coins').textContent = this.stats.coins;
+    hud() {
+        document.getElementById('score').textContent = this.state.score;
+        document.getElementById('coins').textContent = this.state.coins;
     },
 
-    die(reason) {
-        this.playing = false;
-        this.tables.logGame(this.stats.score, this.stats.coins, this.stats.startTime);
+    die() {
+        this.state.playing = false;
+        this.tables.log(this.state.score, this.state.coins, this.state.start);
         this.tables.render(document.getElementById('stats-log'));
-        this.showMenu('game-over');
+        this.show('game-over');
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => Core.init());
+document.addEventListener('DOMContentLoaded', () => Engine.init());

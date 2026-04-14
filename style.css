@@ -4,7 +4,6 @@
     --neon-purple: #8A2BE2;
     --neon-glow: 0 0 10px #FF00FF, 0 0 20px #FF00FF;
     --text-shadow: 0 0 5px #FF00FF;
-    --world-bg: #000000; /* Will be animated by IA */
 }
 
 * {
@@ -15,14 +14,14 @@
 }
 
 body {
-    background-color: var(--world-bg);
+    background-color: var(--black);
     color: var(--neon-pink);
     overflow: hidden;
     height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: background-color 1.5s ease; /* Smooth world transition */
+    transition: background-color 1s ease;
 }
 
 #app {
@@ -32,7 +31,6 @@ body {
     display: flex;
     flex-direction: column;
     padding: 20px;
-    z-index: 5;
 }
 
 .hud {
@@ -41,20 +39,12 @@ body {
     padding: 15px;
     font-weight: 700;
     letter-spacing: 2px;
-    background: rgba(0,0,0,0.5);
-    border-radius: 10px;
-    backdrop-filter: blur(5px);
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255, 0, 255, 0.1);
+    border-radius: 12px;
 }
 
-.stat {
-    font-size: 1.2rem;
-    text-shadow: var(--text-shadow);
-}
-
-.ia-status {
-    color: #fff;
-    opacity: 0.8;
-}
+.stat { text-shadow: var(--text-shadow); }
 
 .game-viewport {
     flex: 1;
@@ -62,51 +52,43 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid rgba(255, 0, 255, 0.2);
-    margin: 10px 0;
+    border: 1px solid rgba(255, 0, 255, 0.1);
+    margin: 15px 0;
 }
 
 canvas {
-    background-color: rgba(0,0,0,0.8);
+    background-color: rgba(0,0,0,0.9);
     max-width: 100%;
     max-height: 75vh;
 }
 
 .webcam-preview {
     position: absolute;
-    top: 15px;
-    right: 15px;
-    width: 110px;
-    height: 85px;
-    background: #111;
-    z-index: 100;
-    border-radius: 8px;
-    opacity: 0.9;
-    overflow: hidden;
-}
-
-.border-neon {
+    top: 20px; right: 20px;
+    width: 120px; height: 90px;
+    background: #000;
+    z-index: 50;
     border: 1px solid var(--neon-pink);
-    box-shadow: 0 0 10px var(--neon-pink);
+    border-radius: 4px;
 }
 
 .menu-overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.95);
+    background: rgba(0,0,0,0.9);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 10;
+    z-index: 100;
 }
 
 .menu-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 25px;
-    text-align: center;
-    width: 80%;
+    gap: 20px;
+    width: 90%;
+    max-width: 600px;
 }
 
 .hidden { display: none !important; }
@@ -114,101 +96,59 @@ canvas {
 .logo-neon {
     font-size: 4rem;
     font-weight: 300;
-    letter-spacing: 10px;
+    letter-spacing: 12px;
     text-shadow: var(--neon-glow);
 }
 
-.difficulty-selector {
-    margin: 15px 0;
-}
-
-.diff-btns {
-    display: flex;
-    gap: 15px;
-    margin-top: 10px;
-}
-
+.diff-btns { display: flex; gap: 10px; margin-top: 10px; }
 .btn-diff {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255,255,255,0.2);
     color: #fff;
-    padding: 10px 20px;
+    padding: 8px 15px;
     cursor: pointer;
-    transition: 0.3s;
-    font-weight: 500;
-    letter-spacing: 1px;
+    transition: 0.2s;
 }
-
-.btn-diff:hover {
-    border-color: var(--neon-pink);
-    color: var(--neon-pink);
-}
-
-.btn-diff.active {
-    background: var(--neon-pink);
-    color: #000;
-    border-color: var(--neon-pink);
-    box-shadow: var(--neon-glow);
-}
+.btn-diff.active { background: var(--neon-pink); color: #000; border-color: var(--neon-pink); }
 
 .btn-neon {
     background: transparent;
     border: 1px solid var(--neon-pink);
     color: var(--neon-pink);
-    padding: 15px 40px;
-    font-size: 1.2rem;
-    font-weight: 500;
-    letter-spacing: 2px;
+    padding: 12px 30px;
+    font-size: 1.1rem;
     cursor: pointer;
+    letter-spacing: 2px;
     transition: 0.3s;
-    text-shadow: var(--text-shadow);
-    box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.1);
 }
-
-.btn-neon:hover {
-    background: var(--neon-pink);
-    color: #000;
-    box-shadow: var(--neon-glow);
-}
+.btn-neon:hover { background: var(--neon-pink); color: #000; box-shadow: var(--neon-glow); }
+.btn-neon.small { padding: 8px 15px; font-size: 0.9rem; }
 
 .btn-secondary {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    padding: 10px 30px;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #aaa;
+    padding: 8px 20px;
     cursor: pointer;
-    transition: 0.3s;
 }
+.btn-secondary:hover { color: #fff; border-color: #fff; }
 
-.btn-secondary:hover { background: rgba(255,255,255,0.1); }
+.ia-setup-row { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.upload-options { display: flex; align-items: center; gap: 15px; }
 
-table { width: 100%; border-collapse: collapse; color: #fff; }
-th, td { padding: 10px; border: 1px solid rgba(255,255,255,0.1); }
-
-.flow-container {
-    height: 4px;
-    background: rgba(255, 0, 255, 0.1);
-    position: relative;
+.neon-input {
+    background: #000;
+    border: 1px solid var(--neon-pink);
+    color: #fff;
+    padding: 10px;
     width: 100%;
 }
 
-.flow-fill {
-    height: 100%;
-    width: 0%;
-    background: var(--neon-pink);
-    box-shadow: var(--neon-glow);
-    transition: width 0.3s ease;
-}
+.flow-container { height: 4px; background: #222; width: 100%; }
+.flow-fill { height: 100%; background: var(--neon-pink); width: 0%; box-shadow: var(--neon-glow); }
 
-.neon-input {
-    background: #111;
-    border: 1px solid var(--neon-pink);
-    color: #fff;
-    padding: 12px;
-    width: 350px;
-    outline: none;
-    text-align: center;
-}
+table { width: 100%; }
+td { padding: 10px; border: 1px solid #333; }
 
 .mt-20 { margin-top: 20px; }
-.text-danger { color: #ff3333; text-shadow: 0 0 10px #ff3333; }
+.text-danger { color: #f00; }
