@@ -1,407 +1,393 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.getElementById('gameCanvas');
-    if (!canvas) {
-        console.error("Canvas não encontrado!");
-        return;
-    }
-    const ctx = canvas.getContext('2d');
+/**
+ * ANTIGRAVITY SNAKE ENGINE v2.0
+ * Roles: Senior Game Developer & AI Engineer
+ */
 
-    // UI Elements
-    const scoreElement = document.getElementById('score');
-    const highScoreElement = document.getElementById('high-score');
-    const coinsDisplay = document.getElementById('coins-display');
-    const finalScoreElement = document.getElementById('final-score');
-    const finalCoinsElement = document.getElementById('final-coins');
-    const deathReasonElement = document.getElementById('death-reason');
-    const shopCoins = document.getElementById('shop-coins');
-    const inGameHud = document.getElementById('in-game-hud');
-
-    // Overlays
-    const mainMenu = document.getElementById('main-menu');
-    const gameOverMenu = document.getElementById('game-over');
-    const shopMenu = document.getElementById('shop-menu');
-    const worldMenu = document.getElementById('world-menu');
-
-    // Buttons
-    const btnPlay = document.getElementById('btn-play');
-    const btnShop = document.getElementById('btn-shop');
-    const btnWorlds = document.getElementById('btn-worlds');
-    const btnRestart = document.getElementById('btn-restart');
-    const btnBackMenu = document.getElementById('btn-back-menu');
-    const btnCloseShop = document.getElementById('btn-close-shop');
-    const btnCloseWorlds = document.getElementById('btn-close-worlds');
-
-    // Labels
-    const currentWorldLabel = document.getElementById('current-world-label');
-    const currentSkinLabel = document.getElementById('current-skin-label');
-    const skinsContainer = document.getElementById('skins-container');
-    const worldCards = document.querySelectorAll('.world-card');
-
-    // Data
-    const SKINS = {
-        'neon': { id: 'neon', name: 'Neon Clássica', price: 0, headColor: '#00ffcc', bodyColor: '#0088aa', type: 'round' },
-        'crystal': { id: 'crystal', name: 'Gruta de Cristal', price: 50, headColor: '#00ddff', bodyColor: '#0044cc', type: 'diamond' },
-        'magma': { id: 'magma', name: 'Verme de Magma', price: 100, headColor: '#ffaa00', bodyColor: '#aa2200', type: 'spike' }
-    };
-
-    const WORLDS = {
-        'neon': { id: 'neon', name: 'Selva Neon' },
-        'crystal': { id: 'crystal', name: 'Caverna de Cristal' },
-        'lava': { id: 'lava', name: 'Vulcão' }
-    };
-
-    // Config & State
-    const gridSize = 20; 
-    const tileCount = canvas.width / gridSize;
-
-    let snake = [];
-    let enemy = [];
-    let items = []; 
-    let dx = 0;
-    let dy = 0;
-    let score = 0;
-    let sessionCoins = 0;
-
-    let gameLoop;
-    let isPlaying = false;
-    let gameSpeed = 100; 
-    let tickCounter = 0;
-
-    // Player Data
-    let savedData = JSON.parse(localStorage.getItem('superSnakeData')) || {
-        highScore: 0,
-        coins: 0,
-        unlockedSkins: ['neon'],
-        currentSkin: 'neon',
-        currentWorld: 'neon'
-    };
-
-    function saveData() {
-        localStorage.setItem('superSnakeData', JSON.stringify(savedData));
-        updateUI();
+class TableMachine {
+    constructor() {
+        this.history = [];
     }
 
-    function updateUI() {
-        if (highScoreElement) highScoreElement.textContent = savedData.highScore;
-        if (coinsDisplay) coinsDisplay.textContent = savedData.coins;
-        if (shopCoins) shopCoins.textContent = savedData.coins;
-        if (currentWorldLabel) currentWorldLabel.textContent = WORLDS[savedData.currentWorld].name;
-        if (currentSkinLabel) currentSkinLabel.textContent = SKINS[savedData.currentSkin].name;
-        document.body.setAttribute('data-world', savedData.currentWorld);
-        
-        worldCards.forEach(c => {
-            c.classList.remove('active');
-            if (c.getAttribute('data-world-id') === savedData.currentWorld) {
-                c.classList.add('active');
-            }
-        });
+    logGame(score, coins, startTime) {
+        const timeSurvived = Math.floor((Date.now() - startTime) / 1000);
+        const entry = {
+            points: score,
+            moedas: coins,
+            tempo_sobrevivencia: `${timeSurvived}s`,
+            timestamp: new Date().toISOString()
+        };
+        this.history.push(entry);
+        return entry;
     }
 
-    function initMenus() {
-        updateUI();
-        renderShop();
-        
-        worldCards.forEach(card => {
-            card.addEventListener('click', () => {
-                savedData.currentWorld = card.getAttribute('data-world-id');
-                saveData();
-            });
-        });
+    renderTable(container) {
+        if (!container) return;
+        const last = this.history[this.history.length - 1];
+        container.innerHTML = `
+            <table>
+                <thead>
+                    <tr><th>METRIC</th><th>VALUE</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>POINTS</td><td>${last.points}</td></tr>
+                    <tr><td>COINS</td><td>${last.moedas}</td></tr>
+                    <tr><td>SURVIVAL</td><td>${last.tempo_sobrevivencia}</td></tr>
+                </tbody>
+            </table>
+        `;
     }
 
-    function renderShop() {
-        if (!skinsContainer) return;
-        skinsContainer.innerHTML = '';
-        Object.values(SKINS).forEach(skin => {
-            const isUnlocked = savedData.unlockedSkins.includes(skin.id);
-            const isActive = savedData.currentSkin === skin.id;
-            
-            const card = document.createElement('div');
-            card.className = `skin-card ${isUnlocked ? '' : 'locked'} ${isActive ? 'active' : ''}`;
-            
-            card.innerHTML = `
-                <div class="skin-preview" style="background:${skin.bodyColor}; border-top: 5px solid ${skin.headColor}"></div>
-                <h4 style="text-align:center">${skin.name}</h4>
-                ${isActive ? '<span>Equipado</span>' : 
-                  isUnlocked ? '<button class="action-btn secondary equip-btn" style="min-width:0; padding: 5px 15px">Equipar</button>' : 
-                  `<button class="buy-btn">💰 ${skin.price}</button>`}
-            `;
-            
-            if (isUnlocked && !isActive) {
-                const equipBtn = card.querySelector('.equip-btn');
-                if (equipBtn) {
-                    equipBtn.addEventListener('click', () => {
-                        savedData.currentSkin = skin.id;
-                        saveData();
-                        renderShop();
-                    });
-                }
-            } else if (!isUnlocked) {
-                const buyBtn = card.querySelector('.buy-btn');
-                if (buyBtn) {
-                    buyBtn.addEventListener('click', () => {
-                        if (savedData.coins >= skin.price) {
-                            savedData.coins -= skin.price;
-                            savedData.unlockedSkins.push(skin.id);
-                            savedData.currentSkin = skin.id;
-                            saveData();
-                            renderShop();
-                        } else {
-                            alert('Moedas insuficientes!');
-                        }
-                    });
-                }
-            }
-            
-            skinsContainer.appendChild(card);
-        });
+    exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "game_stats.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+}
+
+class AntigravityOrchestrator {
+    constructor() {
+        this.progressionLevel = 0;
     }
 
-    function startGame() {
-        snake = [
-            { x: 10, y: 10 },
-            { x: 10, y: 11 },
-            { x: 10, y: 12 }
-        ];
-        dx = 0; dy = -1;
-        score = 0;
-        sessionCoins = 0;
-        gameSpeed = 100;
-        tickCounter = 0;
-        items = [];
-        
-        enemy = [
-            { x: tileCount - 5, y: tileCount - 5 },
-            { x: tileCount - 5, y: tileCount - 4 },
-            { x: tileCount - 5, y: tileCount - 3 },
-            { x: tileCount - 5, y: tileCount - 2 },
-            { x: tileCount - 5, y: tileCount - 1 }
-        ];
-        
-        if (scoreElement) scoreElement.textContent = score;
-        
-        spawnItem('fruit');
-        spawnItem('fruit');
-        spawnItem('coin');
-        
-        isPlaying = true;
-        if (mainMenu) mainMenu.classList.add('hidden');
-        if (gameOverMenu) gameOverMenu.classList.add('hidden');
-        if (inGameHud) inGameHud.classList.remove('hidden');
-        
-        if (gameLoop) clearTimeout(gameLoop);
-        main();
-    }
-
-    function stopGame(reason) {
-        isPlaying = false;
-        if (inGameHud) inGameHud.classList.add('hidden');
-        
-        if (finalScoreElement) finalScoreElement.textContent = score;
-        if (finalCoinsElement) finalCoinsElement.textContent = sessionCoins;
-        if (deathReasonElement) deathReasonElement.textContent = reason;
-        
-        if (score > savedData.highScore) {
-            savedData.highScore = score;
+    processFruit(coins) {
+        // Antigravity Logic: Each 5 coins increases entropy
+        if (coins > 0 && coins % 5 === 0) {
+            this.progressionLevel++;
+            this.updateProgressBar();
+            return true; // Threshold reached
         }
-        savedData.coins += sessionCoins;
-        saveData();
-        
-        if (gameOverMenu) gameOverMenu.classList.remove('hidden');
-    }
-
-    function main() {
-        if (!isPlaying) return;
-        if (checkCollisions()) return; 
-        
-        gameLoop = setTimeout(() => {
-            tickCounter++;
-            clearCanvas();
-            drawItems();
-            moveSnake();
-            drawSnake(snake, SKINS[savedData.currentSkin]);
-            if (tickCounter % 2 === 0) moveEnemy();
-            drawEnemy();
-            if(isPlaying) main();
-        }, gameSpeed);
-    }
-
-    function clearCanvas() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-
-    function spawnItem(type) {
-        let valid = false;
-        let pos;
-        let attempts = 0;
-        while (!valid && attempts < 100) {
-            pos = {
-                x: Math.floor(Math.random() * tileCount),
-                y: Math.floor(Math.random() * tileCount),
-                type: type
-            };
-            let onPlayer = snake.some(s => s.x === pos.x && s.y === pos.y);
-            let onEnemy = enemy.some(e => e.x === pos.x && e.y === pos.y);
-            let onOther = items.some(i => i.x === pos.x && i.y === pos.y);
-            if (!onPlayer && !onEnemy && !onOther) valid = true;
-            attempts++;
-        }
-        if(pos) items.push(pos);
-    }
-
-    function drawItems() {
-        items.forEach(item => {
-            ctx.beginPath();
-            const centerX = item.x * gridSize + gridSize/2;
-            const centerY = item.y * gridSize + gridSize/2;
-            if (item.type === 'fruit') {
-                ctx.shadowBlur = 10; ctx.shadowColor = '#ff0055'; ctx.fillStyle = '#ff0055';
-                ctx.arc(centerX, centerY, gridSize/2 - 2, 0, Math.PI * 2);
-            } else if (item.type === 'coin') {
-                ctx.shadowBlur = 15; ctx.shadowColor = 'gold'; ctx.fillStyle = 'gold';
-                ctx.arc(centerX, centerY, gridSize/2 - 3, 0, Math.PI * 2);
-            }
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        });
-    }
-
-    function moveSnake() {
-        if (snake.length === 0) return;
-        const head = { x: snake[0].x + dx, y: snake[0].y + dy };
-        snake.unshift(head);
-        let ateIndex = items.findIndex(i => i.x === head.x && i.y === head.y);
-        if (ateIndex !== -1) {
-            const item = items[ateIndex];
-            if (item.type === 'fruit') {
-                score += 10;
-                if (scoreElement) scoreElement.textContent = score;
-                spawnItem('fruit');
-                if (Math.random() < 0.3) spawnItem('coin');
-                if (gameSpeed > 60) gameSpeed -= 1;
-            } else if (item.type === 'coin') {
-                sessionCoins += 1;
-                snake.pop();
-            }
-            items.splice(ateIndex, 1);
-        } else {
-            snake.pop();
-        }
-    }
-
-    function moveEnemy() {
-        if (enemy.length === 0 || snake.length === 0) return;
-        const head = enemy[0];
-        const target = snake[0];
-        const possibleMoves = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
-        let bestMove = null;
-        let minDistance = Infinity;
-        possibleMoves.forEach(move => {
-            const nextX = head.x + move.dx;
-            const nextY = head.y + move.dy;
-            if (nextX < 0 || nextX >= tileCount || nextY < 0 || nextY >= tileCount) return;
-            if (enemy.length > 1 && nextX === enemy[1].x && nextY === enemy[1].y) return;
-            const dist = Math.abs(nextX - target.x) + Math.abs(nextY - target.y);
-            if (dist < minDistance) { minDistance = dist; bestMove = move; }
-        });
-        if (bestMove) {
-            enemy.unshift({ x: head.x + bestMove.dx, y: head.y + bestMove.dy });
-            enemy.pop();
-        }
-    }
-
-    function drawSnake(arr, skinDef) {
-        arr.forEach((segment, index) => {
-            const isHead = index === 0;
-            ctx.fillStyle = isHead ? skinDef.headColor : skinDef.bodyColor;
-            ctx.shadowBlur = isHead ? 15 : 0;
-            ctx.shadowColor = skinDef.headColor;
-            const x = segment.x * gridSize;
-            const y = segment.y * gridSize;
-            ctx.beginPath();
-            if (skinDef.type === 'diamond') {
-                ctx.moveTo(x + gridSize/2, y + 2); ctx.lineTo(x + gridSize - 2, y + gridSize/2);
-                ctx.lineTo(x + gridSize/2, y + gridSize - 2); ctx.lineTo(x + 2, y + gridSize/2);
-                ctx.closePath();
-            } else if (skinDef.type === 'spike') {
-                ctx.moveTo(x, y + gridSize/2); ctx.lineTo(x + gridSize/2, y);
-                ctx.lineTo(x + gridSize, y + gridSize/2); ctx.lineTo(x + gridSize/2, y + gridSize);
-                ctx.closePath();
-                ctx.fillRect(x + 4, y + 4, gridSize - 8, gridSize - 8);
-            } else {
-                ctx.arc(x + gridSize/2, y + gridSize/2, isHead ? gridSize/2 - 1 : gridSize/2 - 2, 0, Math.PI * 2);
-            }
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            if (isHead) {
-                ctx.fillStyle = '#000';
-                ctx.fillRect(x + gridSize/2 - 4, y + gridSize/2 - 4, 3, 3);
-                ctx.fillRect(x + gridSize/2 + 2, y + gridSize/2 - 4, 3, 3);
-            }
-        });
-    }
-
-    function drawEnemy() {
-        const enemySkin = { headColor: '#ff2222', bodyColor: '#551111', type: 'spike' };
-        drawSnake(enemy, enemySkin);
-    }
-
-    function checkCollisions() {
-        if (snake.length === 0) return false;
-        const head = snake[0];
-        if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-            stopGame('Você bateu na parede!'); return true;
-        }
-        for (let i = 1; i < snake.length; i++) {
-            if (head.x === snake[i].x && head.y === snake[i].y) {
-                stopGame('Você mordeu o próprio corpo!'); return true;
-            }
-        }
-        for (let i = 0; i < enemy.length; i++) {
-            if (head.x === enemy[i].x && head.y === enemy[i].y) {
-                stopGame('A Minhoca Assassina te pegou!'); return true;
-            }
-        }
+        this.updateProgressBar(coins % 5);
         return false;
     }
 
-    window.addEventListener('keydown', e => {
-        if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.code) > -1) e.preventDefault();
-        if (!isPlaying) return;
+    updateProgressBar(partial = 5) {
+        const bar = document.getElementById('antigravity-bar');
+        if (bar) bar.style.width = `${(partial / 5) * 100}%`;
+    }
+}
+
+class IAManager {
+    constructor() {
+        this.model = null;
+        this.webcam = null;
+        this.labelContainer = null;
+        this.maxPredictions = 0;
+        this.isActive = false;
+        this.currentPrediction = "None";
+    }
+
+    async init(modelURL) {
+        try {
+            const checkpointURL = modelURL + "model.json";
+            const metadataURL = modelURL + "metadata.json";
+
+            this.model = await tmImage.load(checkpointURL, metadataURL);
+            this.maxPredictions = this.model.getTotalClasses();
+
+            const flip = true; 
+            this.webcam = new tmImage.Webcam(120, 90, flip);
+            await this.webcam.setup();
+            await this.webcam.play();
+            
+            document.getElementById("webcam-container").appendChild(this.webcam.canvas);
+            this.isActive = true;
+            document.getElementById('ia-status-label').textContent = "ONLINE";
+            document.getElementById('ia-status-label').style.color = "#00FF00";
+            
+            this.loop();
+            return true;
+        } catch (e) {
+            console.error("Erro IA:", e);
+            alert("Falha ao carregar modelo IA. Verifique a URL.");
+            return false;
+        }
+    }
+
+    async loop() {
+        if (!this.isActive) return;
+        this.webcam.update();
+        await this.predict();
+        window.requestAnimationFrame(() => this.loop());
+    }
+
+    async predict() {
+        const prediction = await this.model.predict(this.webcam.canvas);
+        let highestProb = 0;
+        let bestClass = "None";
+
+        for (let i = 0; i < this.maxPredictions; i++) {
+            if (prediction[i].probability > highestProb) {
+                highestProb = prediction[i].probability;
+                bestClass = prediction[i].className;
+            }
+        }
+
+        // Logic: Confidence >= 80%
+        if (highestProb >= 0.8) {
+            this.currentPrediction = bestClass;
+        }
+    }
+}
+
+// MAIN ENGINE
+const game = {
+    canvas: null,
+    ctx: null,
+    grid: 20,
+    tileCount: 40, // 800/20
+    snake: [],
+    dx: 0, dy: -1,
+    food: null,
+    coins: [],
+    score: 0,
+    sessionCoins: 0,
+    startTime: 0,
+    isPlaying: false,
+    speed: 120,
+    enemy: { body: [], speed: 2 }, // enemy speed counter
+    
+    // Components
+    tableMachine: new TableMachine(),
+    antigravity: new AntigravityOrchestrator(),
+    ia: new IAManager(),
+
+    init() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.setupListeners();
+    },
+
+    setupListeners() {
+        document.getElementById('btn-play').onclick = () => this.start();
+        document.getElementById('btn-restart').onclick = () => this.start();
+        document.getElementById('btn-setup-ia').onclick = () => this.toggleMenu('ia-menu');
+        document.getElementById('btn-worlds').onclick = () => this.toggleMenu('world-menu');
+        
+        // FIX: Voltar button behavior
+        document.getElementById('btn-close-worlds').onclick = () => this.toggleMenu('main-menu');
+        document.getElementById('btn-close-ia').onclick = () => this.toggleMenu('main-menu');
+        document.getElementById('btn-back-menu').onclick = () => this.toggleMenu('main-menu');
+
+        document.getElementById('btn-start-ia').onclick = async () => {
+            const url = document.getElementById('ia-model-url').value;
+            if (url) await this.ia.init(url);
+            else alert("URL Necessária!");
+        };
+
+        document.getElementById('btn-download-json').onclick = () => this.tableMachine.exportJSON();
+
+        window.addEventListener('keydown', e => this.handleInput(e));
+    },
+
+    toggleMenu(menuId) {
+        document.querySelectorAll('.menu-content').forEach(m => m.classList.add('hidden'));
+        document.getElementById(menuId).classList.remove('hidden');
+        document.getElementById('overlay-menu').classList.remove('hidden');
+    },
+
+    start() {
+        this.snake = [{x: 20, y: 20}, {x: 20, y: 21}, {x: 20, y: 22}];
+        this.dx = 0; this.dy = -1;
+        this.score = 0;
+        this.sessionCoins = 0;
+        this.speed = 120;
+        this.startTime = Date.now();
+        this.spawnFood();
+        this.coins = [];
+        this.enemy.body = [{x: 5, y: 5}, {x: 5, y: 6}, {x: 5, y: 7}];
+        
+        this.isPlaying = true;
+        document.getElementById('overlay-menu').classList.add('hidden');
+        this.loop();
+    },
+
+    loop() {
+        if (!this.isPlaying) return;
+        
+        // IA Control Check
+        if (this.ia.isActive) {
+            this.handleIAGesture(this.ia.currentPrediction);
+        }
+
+        setTimeout(() => {
+            this.update();
+            this.draw();
+            this.loop();
+        }, this.speed);
+    },
+
+    handleIAGesture(gesture) {
+        // Modern turning logic based on gestural rotation
+        if (gesture === "None") return;
+        
+        // Use relative turning based on current direction
+        // Mão Aberta -> Girar Direita | Punho Fechado -> Girar Esquerda
+        if (gesture === "Mão Aberta") {
+            this.rotateSnake(1); // 1 = Clockwise
+        } else if (gesture === "Punho Fechado") {
+            this.rotateSnake(-1); // -1 = Counter-clockwise
+        }
+    },
+
+    rotateSnake(dir) {
+        // Simple rotation mapping
+        const currentDx = this.dx;
+        const currentDy = this.dy;
+        
+        if (dir === 1) { // Right turn
+            this.dx = -currentDy;
+            this.dy = currentDx;
+        } else { // Left turn
+            this.dx = currentDy;
+            this.dy = -currentDx;
+        }
+        // Force cleanup prediction to avoid spinning
+        this.ia.currentPrediction = "None";
+    },
+
+    handleInput(e) {
         const key = e.key.toLowerCase();
-        if ((key === 'arrowup' || key === 'w') && dy !== 1) { dx = 0; dy = -1; }
-        else if ((key === 'arrowdown' || key === 's') && dy !== -1) { dx = 0; dy = 1; }
-        else if ((key === 'arrowleft' || key === 'a') && dx !== 1) { dx = -1; dy = 0; }
-        else if ((key === 'arrowright' || key === 'd') && dx !== -1) { dx = 1; dy = 0; }
-    });
+        if ((key === 'arrowup' || key === 'w') && this.dy === 0) { this.dx = 0; this.dy = -1; }
+        if ((key === 'arrowdown' || key === 's') && this.dy === 0) { this.dx = 0; this.dy = 1; }
+        if ((key === 'arrowleft' || key === 'a') && this.dx === 0) { this.dx = -1; this.dy = 0; }
+        if ((key === 'arrowright' || key === 'd') && this.dx === 0) { this.dx = 1; this.dy = 0; }
+    },
 
-    if (btnPlay) btnPlay.addEventListener('click', startGame);
-    if (btnRestart) btnRestart.addEventListener('click', startGame);
-    if (btnBackMenu) btnBackMenu.addEventListener('click', () => {
-        if (gameOverMenu) gameOverMenu.classList.add('hidden');
-        if (mainMenu) mainMenu.classList.remove('hidden');
-        clearCanvas();
-    });
+    update() {
+        const head = { x: this.snake[0].x + this.dx, y: this.snake[0].y + this.dy };
+        
+        // FIX: Collision Detection (Strict grid)
+        if (head.x < 0 || head.x >= this.tileCount || head.y < 0 || head.y >= this.tileCount) {
+            return this.gameOver("WALL COLLISION");
+        }
 
-    if (btnShop) btnShop.addEventListener('click', () => {
-        renderShop();
-        if (mainMenu) mainMenu.classList.add('hidden');
-        if (shopMenu) shopMenu.classList.remove('hidden');
-    });
-    if (btnCloseShop) btnCloseShop.addEventListener('click', () => {
-        if (shopMenu) shopMenu.classList.add('hidden');
-        if (mainMenu) mainMenu.classList.remove('hidden');
-    });
+        for (let s of this.snake) {
+            if (head.x === s.x && head.y === s.y) return this.gameOver("SELF COLLISION");
+        }
 
-    if (btnWorlds) btnWorlds.addEventListener('click', () => {
-        if (mainMenu) mainMenu.classList.add('hidden');
-        if (worldMenu) worldMenu.classList.remove('hidden');
-    });
-    if (btnCloseWorlds) btnCloseWorlds.addEventListener('click', () => {
-        if (worldMenu) worldMenu.classList.remove('hidden');
-        if (mainMenu) mainMenu.classList.remove('hidden');
-    });
+        // Enemy collision
+        for (let e of this.enemy.body) {
+            if (head.x === e.x && head.y === e.y) return this.gameOver("FATAL ENEMY ENCOUNTER");
+        }
 
-    initMenus();
-    clearCanvas();
-});
+        this.snake.unshift(head);
+
+        // Check Food
+        if (head.x === this.food.x && head.y === this.food.y) {
+            this.score += 10;
+            this.spawnFood();
+            this.antigravity.processFruit(this.sessionCoins);
+        } else {
+            this.snake.pop();
+        }
+
+        // Check Coins
+        const coinIndex = this.coins.findIndex(c => c.x === head.x && c.y === head.y);
+        if (coinIndex !== -1) {
+            this.coins.splice(coinIndex, 1);
+            this.sessionCoins++;
+            document.getElementById('coins').textContent = this.sessionCoins;
+            
+            // Antigravity Orchestration: Progress Difficulty
+            if (this.antigravity.processFruit(this.sessionCoins)) {
+                this.speed = Math.max(50, this.speed - 10); // Faster
+                this.enemy.speed = Math.max(1, this.enemy.speed - 1); // Enemy logic faster? 
+            }
+        }
+
+        this.updateEnemy();
+        document.getElementById('score').textContent = this.score;
+    },
+
+    updateEnemy() {
+        // AI Predator: Moves toward player
+        const eHead = this.enemy.body[0];
+        const pHead = this.snake[0];
+        
+        const possibleMoves = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
+        let best = possibleMoves[0];
+        let minDist = Infinity;
+
+        possibleMoves.forEach(m => {
+            const nx = eHead.x + m.x;
+            const ny = eHead.y + m.y;
+            const dist = Math.abs(nx - pHead.x) + Math.abs(ny - pHead.y);
+            if (dist < minDist) { minDist = dist; best = m; }
+        });
+
+        this.enemy.body.unshift({x: eHead.x + best.x, y: eHead.y + best.y});
+        this.enemy.body.pop();
+    },
+
+    draw() {
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, 800, 800);
+
+        // Draw HUD lines (Minimalist)
+        this.ctx.strokeStyle = 'rgba(255, 0, 255, 0.05)';
+        for(let i=0; i<800; i+=this.grid) {
+            this.ctx.beginPath(); this.ctx.moveTo(i, 0); this.ctx.lineTo(i, 800); this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.moveTo(0, i); this.ctx.lineTo(800, i); this.ctx.stroke();
+        }
+
+        // Draw Player (Neon Pink)
+        this.ctx.shadowBlur = 15;
+        this.ctx.shadowColor = '#FF00FF';
+        this.ctx.fillStyle = '#FF00FF';
+        this.snake.forEach(s => {
+            this.ctx.fillRect(s.x * this.grid + 1, s.y * this.grid + 1, this.grid - 2, this.grid - 2);
+        });
+
+        // Draw Enemy (Dark Purple/Pink)
+        this.ctx.shadowColor = '#8A2BE2';
+        this.ctx.fillStyle = '#8A2BE2';
+        this.enemy.body.forEach(e => {
+            this.ctx.fillRect(e.x * this.grid + 1, e.y * this.grid + 1, this.grid - 2, this.grid - 2);
+        });
+
+        // Draw Food
+        this.ctx.shadowColor = '#FF00FF';
+        this.ctx.fillStyle = '#FF00FF';
+        this.ctx.beginPath();
+        this.ctx.arc(this.food.x * this.grid + this.grid/2, this.food.y * this.grid + this.grid/2, this.grid/3, 0, Math.PI*2);
+        this.ctx.fill();
+
+        // Draw Coins
+        this.ctx.fillStyle = '#FFF'; 
+        this.ctx.shadowColor = '#FFF';
+        this.coins.forEach(c => {
+            this.ctx.beginPath();
+            this.ctx.arc(c.x * this.grid + this.grid/2, c.y * this.grid + this.grid/2, this.grid/4, 0, Math.PI*2);
+            this.ctx.fill();
+        });
+
+        this.ctx.shadowBlur = 0;
+    },
+
+    spawnFood() {
+        this.food = { 
+            x: Math.floor(Math.random() * this.tileCount), 
+            y: Math.floor(Math.random() * this.tileCount) 
+        };
+        // Randomly spawn coins
+        if (Math.random() > 0.7) {
+            this.coins.push({
+                x: Math.floor(Math.random() * this.tileCount), 
+                y: Math.floor(Math.random() * this.tileCount)
+            });
+        }
+    },
+
+    gameOver(reason) {
+        this.isPlaying = false;
+        this.tableMachine.logGame(this.score, this.sessionCoins, this.startTime);
+        this.tableMachine.renderTable(document.getElementById('stats-log'));
+        this.toggleMenu('game-over');
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => game.init());

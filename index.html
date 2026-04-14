@@ -3,105 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Snake - Worlds & Skins</title>
-    <meta name="description" content="Um jogo da cobrinha (snake) dinâmico com loja, múltiplas peles e inimigos mortais!">
-    
+    <title>Antigravity Snake - IA Edition</title>
+    <!-- Modern Tech Stack -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
-<body data-world="neon">
-    <div class="game-container">
-        <header>
-            <h1>Super Snake</h1>
-            <div class="top-bar">
-                <div class="scores">
-                    <div class="score-card">
-                        <span class="label">Score</span>
-                        <span id="score" class="value">0</span>
-                    </div>
-                    <div class="score-card high-score-card">
-                        <span class="label">High</span>
-                        <span id="high-score" class="value">0</span>
-                    </div>
-                </div>
-                <div class="wallet-card">
-                    <span class="label">Moedas</span>
-                    <span class="value">💰 <span id="coins-display">0</span></span>
-                </div>
-            </div>
-        </header>
-        
-        <div class="canvas-wrapper">
-            <canvas id="gameCanvas" width="800" height="800"></canvas>
-            
-            <!-- Menu Principal -->
-            <div id="main-menu" class="overlay">
-                <h2>Menu Principal</h2>
-                <button id="btn-play" class="action-btn mt-10">Jogar</button>
-                <div class="menu-row mt-10">
-                    <button id="btn-shop" class="action-btn secondary">Skins & Loja</button>
-                    <button id="btn-worlds" class="action-btn secondary">Mundos</button>
-                </div>
-                <div class="mt-10" style="font-size: 0.9rem; opacity: 0.8;">
-                    <p>Mundo: <span id="current-world-label" class="highlight">Selva Neon</span></p>
-                    <p>Skin: <span id="current-skin-label" class="highlight">Neon Clássica</span></p>
-                </div>
-            </div>
-
-            <!-- Game Over -->
-            <div id="game-over" class="overlay hidden">
-                <h2>Game Over!</h2>
-                <div class="end-stats" style="text-align: center; margin: 10px 0;">
-                    <p style="font-size: 1.5rem;">Pontuação: <span id="final-score" style="color:var(--accent-color); font-weight:bold;">0</span></p>
-                    <p style="font-size: 1.5rem;">Moedas Ganhas: <span id="final-coins" style="color:gold; font-weight:bold;">0</span></p>
-                </div>
-                <p id="death-reason" class="death-reason">Você bateu!</p>
-                <button id="btn-restart" class="action-btn mt-10">Jogar Novamente</button>
-                <button id="btn-back-menu" class="action-btn secondary mt-10">Menu Principal</button>
-            </div>
-
-            <!-- Loja de Skins -->
-            <div id="shop-menu" class="overlay hidden">
-                <h2>Loja de Skins</h2>
-                <p>Suas Moedas: 💰 <span id="shop-coins" class="highlight" style="color:gold;">0</span></p>
-                <div class="skins-grid" id="skins-container">
-                    <!-- Gerado via JS -->
-                </div>
-                <button id="btn-close-shop" class="action-btn secondary mt-10">Voltar</button>
-            </div>
-
-            <!-- Seleção de Mundos -->
-            <div id="world-menu" class="overlay hidden">
-                <h2>Selecionar Mundo</h2>
-                <div class="worlds-grid">
-                    <div class="world-card" data-world-id="neon">
-                        <h3>Selva Neon</h3>
-                        <p>Clássico brilhante</p>
-                    </div>
-                    <div class="world-card" data-world-id="crystal">
-                        <h3>Cristais</h3>
-                        <p>Caverna mística</p>
-                    </div>
-                    <div class="world-card" data-world-id="lava">
-                        <h3>Vulcão</h3>
-                        <p>Magma fervente</p>
-                    </div>
-                </div>
-                <button id="btn-close-worlds" class="action-btn secondary mt-10">Voltar</button>
-            </div>
-            
-            <!-- HUD in Game -->
-            <div id="in-game-hud" style="position:absolute; top: 10px; right: 20px; font-weight: bold; text-shadow: 0 0 5px #000; pointer-events: none;" class="hidden">
-                <span style="color:#ff0055;">❤️ Cuidado com o caçador!</span>
-            </div>
-
+<body>
+    <div id="app">
+        <!-- Minimal HUD -->
+        <div class="hud">
+            <div class="stat">SCORE <span id="score">0</span></div>
+            <div class="stat">COINS <span id="coins">0</span></div>
+            <div class="stat ia-status">IA: <span id="ia-status-label">OFF</span></div>
         </div>
-        
-        <footer>
-            <div class="controls-hint">
-                <span>Use setas direcionais ou W A S D para controlar. <br/>🔴 Frutas dão pontos e tamanho. 💰 Moedas de ouro compram skins! <br/>😈 Fuja da Minhoca Inimiga Cobre!</span>
+
+        <div class="game-viewport">
+            <!-- IA Webcam View (Floating) -->
+            <div id="webcam-container" class="webcam-preview border-neon"></div>
+            
+            <canvas id="gameCanvas" width="800" height="800"></canvas>
+
+            <!-- Menus -->
+            <div id="overlay-menu" class="menu-overlay">
+                <div id="main-menu" class="menu-content">
+                    <h1 class="logo-neon">NEON SNAKE</h1>
+                    <p class="subtitle">PREMIUM IA-CONTROLLED EXPERIENCE</p>
+                    
+                    <div class="menu-actions">
+                        <button id="btn-play" class="btn-neon">INICIAR JOGO</button>
+                        <button id="btn-setup-ia" class="btn-secondary">CONFIGURAR IA</button>
+                        <button id="btn-worlds" class="btn-secondary">REVISAR MUNDOS</button>
+                    </div>
+                </div>
+
+                <div id="world-menu" class="menu-content hidden">
+                    <h2 class="title-minimal">MUNDOS</h2>
+                    <div class="world-options">
+                        <div class="world-card border-neon active" data-world="neon">VOID NEON</div>
+                        <div class="world-card border-neon" data-world="crystal">CRYSTAL CAVE</div>
+                        <div class="world-card border-neon" data-world="lava">LAVA CORE</div>
+                    </div>
+                    <button id="btn-close-worlds" class="btn-secondary mt-20">VOLTAR</button>
+                </div>
+
+                <div id="game-over" class="menu-content hidden">
+                    <h1 class="text-danger">TERMINAL FAILURE</h1>
+                    <div id="stats-log" class="log-table-container">
+                        <!-- Table Machine output will be here -->
+                    </div>
+                    <div class="menu-actions">
+                        <button id="btn-restart" class="btn-neon">REBOOT</button>
+                        <button id="btn-download-json" class="btn-secondary">EXPORT DATA (.JSON)</button>
+                        <button id="btn-back-menu" class="btn-secondary">EXIT TO CORE</button>
+                    </div>
+                </div>
+
+                <!-- IA Configuration Overlay -->
+                <div id="ia-menu" class="menu-content hidden">
+                    <h2 class="title-minimal">TEACHABLE MACHINE</h2>
+                    <p>Insira a URL do seu modelo exportado:</p>
+                    <input type="text" id="ia-model-url" placeholder="https://teachablemachine.withgoogle.com/models/..." class="neon-input">
+                    <div class="ia-controls mt-20">
+                        <button id="btn-start-ia" class="btn-neon">ATIVAR WEBCAM & IA</button>
+                        <button id="btn-close-ia" class="btn-secondary">VOLTAR</button>
+                    </div>
+                </div>
             </div>
-        </footer>
+        </div>
+
+        <!-- Progress Bar (Antigravity Flow) -->
+        <div class="flow-container">
+            <div id="antigravity-bar" class="flow-fill"></div>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
