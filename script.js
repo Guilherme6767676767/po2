@@ -1,5 +1,6 @@
 /**
- * ANTIGRAVITY SNAKE ENGINE v3.1 - INTERFACE & IA VERIFIED
+ * ANTIGRAVITY SNAKE ENGINE v3.2 - BASIC MODE
+ * Senior Developer Fix: Added Native Color Extraction from Images
  */
 
 class TableMachine {
@@ -11,17 +12,11 @@ class TableMachine {
     render(container) {
         if (!container) return;
         const last = this.history[this.history.length - 1];
-        container.innerHTML = `
-            <table>
-                <tr><td>POINTS</td><td>${last.points}</td></tr>
-                <tr><td>COINS</td><td>${last.moedas}</td></tr>
-                <tr><td>SURVIVAL</td><td>${last.tempo}</td></tr>
-            </table>
-        `;
+        container.innerHTML = `<table><tr><td>POINTS</td><td>${last.points}</td></tr><tr><td>COINS</td><td>${last.moedas}</td></tr><tr><td>TIME</td><td>${last.tempo}</td></tr></table>`;
     }
     export() {
         const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
-        const a = document.createElement('a'); a.href = data; a.download = "snake.json"; a.click();
+        const a = document.createElement('a'); a.href = data; a.download = "stats.json"; a.click();
     }
 }
 
@@ -29,10 +24,17 @@ class IAManager {
     constructor() {
         this.model = null; this.webcam = null; this.isActive = false;
         this.currentClass = "DEFAULT";
-        this.colorPalette = {
-            "Red": "#400", "Vermelho": "#400", "Blue": "#004", "Azul": "#004",
-            "Green": "#040", "Verde": "#040", "Yellow": "#440", "Amarelo": "#440"
-        };
+    }
+
+    // MODO BÁSICO: Extrai a cor média real de qualquer imagem sem precisar de IA
+    extractAverageColor(imgElement) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1; canvas.height = 1; 
+        ctx.drawImage(imgElement, 0, 0, 1, 1);
+        const data = ctx.getImageData(0, 0, 1, 1).data;
+        // Aplicamos um escurecimento (0.4) para manter o tema neon legível
+        return `rgb(${Math.floor(data[0]*0.4)}, ${Math.floor(data[1]*0.4)}, ${Math.floor(data[2]*0.4)})`;
     }
 
     async loadModel(url) {
@@ -40,20 +42,20 @@ class IAManager {
         try {
             status.textContent = "Status: Carregando...";
             this.model = await tmImage.load(url + "model.json", url + "metadata.json");
-            status.textContent = "Status: Modelo Carregado!";
+            status.textContent = "Status: Modelo Ativo!";
             return true;
         } catch (e) {
-            status.textContent = "Status: Erro no Link.";
+            status.textContent = "Status: Off (Cores básicas via Upload ativas)";
             return false;
         }
     }
 
     async startWebcam() {
-        if (!this.model) return alert("Carregue o modelo primeiro!");
+        if (!this.model) return alert("Carregue o modelo primeiro para usar Webcam!");
         this.webcam = new tmImage.Webcam(120, 90, true);
         await this.webcam.setup(); await this.webcam.play();
-        const container = document.getElementById("webcam-container");
-        container.innerHTML = ""; container.appendChild(this.webcam.canvas);
+        document.getElementById("webcam-container").innerHTML = "";
+        document.getElementById("webcam-container").appendChild(this.webcam.canvas);
         this.isActive = true;
         this.loop();
     }
@@ -61,53 +63,49 @@ class IAManager {
     async loop() {
         if (!this.isActive) return;
         this.webcam.update();
-        await this.predict(this.webcam.canvas);
+        const prediction = await this.model.predict(this.webcam.canvas);
+        this.handlePrediction(prediction);
         window.requestAnimationFrame(() => this.loop());
     }
 
-    async predict(element) {
-        if (!this.model) return;
-        const prediction = await this.model.predict(element);
+    handlePrediction(prediction) {
         let best = { prob: 0, class: "" };
         prediction.forEach(p => { if (p.probability > best.prob) best = { prob: p.probability, class: p.className }; });
-
         if (best.prob > 0.8 && best.class !== this.currentClass) {
             this.currentClass = best.class;
             document.getElementById('ia-current-class').textContent = this.currentClass;
-            this.applyColor(this.currentClass);
+            this.applyColorByClass(this.currentClass);
         }
+    }
+
+    applyColorByClass(name) {
+        const map = { "Red": "#300", "Vermelho": "#300", "Blue": "#003", "Azul": "#003", "Green": "#030", "Verde": "#030" };
+        if (map[name]) document.body.style.backgroundColor = map[name];
     }
 
     async handleUpload(file) {
-        if (!this.model) return alert("Carregue o modelo primeiro!");
         const img = document.getElementById('upload-preview');
         const reader = new FileReader();
-        reader.onload = async (e) => {
+        reader.onload = (e) => {
             img.src = e.target.result;
-            img.onload = async () => {
-                await this.predict(img);
+            img.onload = () => {
+                // PRIMEIRO: Extrair a cor física da imagem (Funciona sempre!)
+                const pickedColor = this.extractAverageColor(img);
+                document.body.style.backgroundColor = pickedColor;
+                document.getElementById('ia-current-class').textContent = "COLOR DETECTED";
+                
+                // SEGUNDO: Se tiver modelo de IA, tenta classificar lógico
+                if (this.model) this.model.predict(img).then(p => this.handlePrediction(p));
             };
         }
         reader.readAsDataURL(file);
-    }
-
-    applyColor(className) {
-        const color = this.colorPalette[className] || "#000000";
-        document.body.style.backgroundColor = color;
     }
 }
 
 const Engine = {
     state: { score: 0, coins: 0, difficulty: 'easy', start: 0, playing: false },
-    diffs: {
-        easy: { speed: 140, entropy: 0.5 },
-        medium: { speed: 100, entropy: 1.0 },
-        hard: { speed: 70, entropy: 1.5 }
-    },
-    snake: [], dx: 0, dy: -1,
-    enemy: { body: [] },
-    food: null, gold: [],
-
+    diffs: { easy: { speed: 140 }, medium: { speed: 100 }, hard: { speed: 70 } },
+    snake: [], dx: 0, dy: -1, enemy: { body: [] }, food: null, gold: [],
     tables: new TableMachine(),
     ia: new IAManager(),
 
@@ -118,21 +116,18 @@ const Engine = {
     },
 
     bind() {
-        // Main Navigation
         document.getElementById('btn-play').onclick = () => this.boot();
         document.getElementById('btn-setup-ia').onclick = () => this.show('ia-menu');
         
-        // Difficulty
         ['easy', 'medium', 'hard'].forEach(id => {
             const btn = document.getElementById(`diff-${id}`);
-            btn.onclick = () => {
+            if (btn) btn.onclick = (e) => {
                 document.querySelectorAll('.btn-diff').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.state.difficulty = id;
             };
         });
 
-        // IA Functions
         document.getElementById('btn-load-model').onclick = () => {
             const url = document.getElementById('ia-model-url').value;
             if (url) this.ia.loadModel(url);
@@ -140,12 +135,9 @@ const Engine = {
         document.getElementById('btn-start-webcam').onclick = () => this.ia.startWebcam();
         document.getElementById('ia-image-upload').onchange = (e) => this.ia.handleUpload(e.target.files[0]);
         document.getElementById('btn-close-ia').onclick = () => this.show('main-menu');
-
-        // Game Over Functions
         document.getElementById('btn-restart').onclick = () => this.boot();
         document.getElementById('btn-back-menu').onclick = () => this.show('main-menu');
         document.getElementById('btn-download-json').onclick = () => this.tables.export();
-
         window.onkeydown = (e) => this.keys(e);
     },
 
@@ -169,15 +161,11 @@ const Engine = {
 
     loop() {
         if (!this.state.playing) return;
-        const currentSpeed = this.diffs[this.state.difficulty].speed;
-        // Increase speed based on coins and entropy
-        const dynamicSpeed = Math.max(40, currentSpeed - (this.state.coins * 5 * this.diffs[this.state.difficulty].entropy));
-        
         setTimeout(() => {
             this.update();
             this.draw();
             this.loop();
-        }, dynamicSpeed);
+        }, this.diffs[this.state.difficulty].speed - (this.state.coins * 2));
     },
 
     update() {
@@ -185,26 +173,14 @@ const Engine = {
         if (head.x < 0 || head.x >= 40 || head.y < 0 || head.y >= 40) return this.die();
         if (this.snake.some(s => s.x === head.x && s.y === head.y)) return this.die();
         if (this.enemy.body.some(e => e.x === head.x && e.y === head.y)) return this.die();
-
         this.snake.unshift(head);
-
-        if (head.x === this.food.x && head.y === this.food.y) {
-            this.state.score += 10;
-            this.spawn();
-        } else {
-            this.snake.pop();
-        }
-
+        if (head.x === this.food.x && head.y === this.food.y) { this.state.score += 10; this.spawn(); }
+        else { this.snake.pop(); }
         const gIdx = this.gold.findIndex(g => g.x === head.x && g.y === head.y);
-        if (gIdx !== -1) {
-            this.gold.splice(gIdx, 1);
-            this.state.coins++;
-            // Update Antigravity Bar
-            document.getElementById('antigravity-bar').style.width = `${(this.state.coins % 5 / 5) * 100}%`;
-        }
-
+        if (gIdx !== -1) { this.gold.splice(gIdx, 1); this.state.coins++; }
         this.aiEnemy();
-        this.hud();
+        document.getElementById('score').textContent = this.state.score;
+        document.getElementById('coins').textContent = this.state.coins;
     },
 
     aiEnemy() {
@@ -232,10 +208,7 @@ const Engine = {
         this.ctx.fillStyle = '#F0F';
         this.ctx.beginPath(); this.ctx.arc(this.food.x*20+10, this.food.y*20+10, 6, 0, Math.PI*2); this.ctx.fill();
         this.ctx.fillStyle = '#FFF';
-        this.gold.forEach(g => {
-            this.ctx.beginPath(); this.ctx.arc(g.x*20+10, g.y*20+10, 4, 0, Math.PI*2); this.ctx.fill();
-        });
-        this.ctx.shadowBlur = 0;
+        this.gold.forEach(g => { this.ctx.beginPath(); this.ctx.arc(g.x*20+10, g.y*20+10, 4, 0, Math.PI*2); this.ctx.fill(); });
     },
 
     spawn() {
@@ -249,11 +222,6 @@ const Engine = {
         if ((k === 'arrowdown' || k === 's') && this.dy === 0) { this.dx = 0; this.dy = 1; }
         if ((k === 'arrowleft' || k === 'a') && this.dx === 0) { this.dx = -1; this.dy = 0; }
         if ((k === 'arrowright' || k === 'd') && this.dx === 0) { this.dx = 1; this.dy = 0; }
-    },
-
-    hud() {
-        document.getElementById('score').textContent = this.state.score;
-        document.getElementById('coins').textContent = this.state.coins;
     },
 
     die() {
