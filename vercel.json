@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/socket.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/socket.io/(.*)", "destination": "/api/socket.js" }
+  ]
+}
